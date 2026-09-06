@@ -48,6 +48,10 @@
   .mapinfo .lim{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
   .mapinfo input{width:70px;background:#0e1721;color:var(--ink);border:1px solid var(--line);
     border-radius:8px;padding:8px;font:inherit;text-align:center}
+  .mapinfo select{background:#0e1721;color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:8px;font:inherit;flex:1;min-width:0}
+  .mapinfo input.wide{width:100%}
+  .mapinfo .lim button{padding:9px 13px}
   .mapinfo .x{position:absolute;right:10px;top:8px;color:var(--dim);font-size:20px;padding:4px 8px;cursor:pointer}
 
   /* --- navigacijski sloj mape --- */
@@ -63,7 +67,7 @@
   #rotBtn svg{width:21px;height:21px;display:block;margin:auto}
   #rotBtn g{transform-origin:12px 12px}
   #rotBtn[aria-pressed="false"]{border-color:var(--blue)}
-  .layers{position:absolute;right:10px;top:206px;display:none;flex-direction:column;gap:3px;
+  .layers{position:absolute;right:10px;top:256px;display:none;flex-direction:column;gap:3px;
     background:rgba(20,30,43,.96);border:1px solid var(--line);border-radius:12px;padding:6px}
   .layers.on{display:flex}
   .layers button{padding:9px 14px;font-size:13px;text-align:left;background:transparent;border:0}
@@ -124,6 +128,9 @@
   ul.fn li{display:list-item;background:none;border:0;border-top:1px solid var(--line);
     border-radius:0;padding:8px 2px;font-size:13px;color:var(--dim)}
   ul.fn li.key{color:var(--ink);font-weight:600}
+  #mojeJson{width:100%;margin-top:12px;background:#0e1721;color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;font-size:12px;
+    resize:vertical;-webkit-user-select:text;user-select:text}
   .offbtns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   .offbtns .primary{flex:0 0 auto}
 
@@ -198,6 +205,7 @@
     <button id="zin" title="Uvećaj">+</button>
     <button id="zout" title="Umanji">−</button>
     <button id="layBtn" title="Vrsta mape" aria-expanded="false">🗺</button>
+    <button id="addBtn" title="Dodaj radar ovdje">📍</button>
     <button id="rotBtn" title="Sjever gore / smjer vožnje" aria-pressed="true">
       <svg viewBox="0 0 24 24" aria-hidden="true"><g id="rotN">
         <path d="M12 2.5 L16.6 20.5 L12 15.6 Z" fill="#e8352a"/>
@@ -213,6 +221,21 @@
 
 <!-- OGRANIČENJA -->
 <section class="view" id="limView">
+  <div class="vrsta">
+    <h3>Moje oznake <em id="mojeBroj">0</em></h3>
+    <p class="hint">Radare koje sam dodaš sa puta prepoznaješ na mapi po isprekidanom prstenu.
+      Čuvaju se <b>samo na ovom telefonu</b> — ako obrišeš podatke browsera ili promijeniš uređaj,
+      nestaju. Zato ih povremeno izvezi i sačuvaj tekst negdje, ili ga pošalji da uđe u zvaničnu bazu.</p>
+    <div class="offbtns">
+      <button id="mojeIzvoz">Izvezi</button>
+      <button id="mojeUvoz">Uvezi</button>
+      <button id="mojeBrisi">Obriši sve</button>
+    </div>
+    <textarea id="mojeJson" rows="4" hidden
+      placeholder="zalijepi ovdje tekst koji si ranije izvezao, pa pritisni Uvezi"></textarea>
+    <p class="hint" id="mojePoruka" style="margin-top:10px"></p>
+  </div>
+
   <input class="search" id="q" placeholder="Traži po nazivu ili gradu">
   <p class="hint">Unesi ograničenje brzine (km/h) za svaku lokaciju. Prazno polje vraća podrazumijevanu vrijednost. Kod sekcijskih dionica dodatno se unosi stvarna dužina dionice po putu, u metrima — po njoj se računa prosječna brzina.</p>
   <ul id="limList"></ul>
@@ -457,6 +480,37 @@ try{const s=localStorage.getItem("radari.cfg"); if(s) CFG=Object.assign(CFG,JSON
 function save(){try{localStorage.setItem("radari.cfg",JSON.stringify(CFG));}catch(e){}}
 const limOf=r=>CFG.lim[r.id]||DEF[r.tip];
 const lenOf=s=>CFG.len[s.id]||s.base;
+
+/* ============ MOJE OZNAKE (dodate sa terena) ============ */
+/* Cuvaju se u CFG-u odvojeno od zvanicne baze, a u R ulaze tek posto je
+   SEC vec napravljen, da ne upadnu izmedju para sekcijske dionice.
+   Zato su dozvoljeni samo tipovi 1 i 2 - sekcijska dionica ima smisla
+   samo kao par, a par se ne dodaje jednim dodirom sa puta. */
+if(!Array.isArray(CFG.moji)) CFG.moji=[];
+function mojeUR(){
+  CFG.moji.forEach(m=>{
+    if(R.some(r=>r.id===m.id))return;
+    R.push({id:m.id,lat:m.lat,lon:m.lon,tip:m.tip,grad:"moja oznaka",naziv:m.naziv,st:0,moj:true});
+  });
+}
+function mojNoviId(){ return CFG.moji.reduce((m,x)=>Math.max(m,x.id),1000)+1; }
+function mojDodaj(lat,lon,tip,naziv,lim){
+  const m={id:mojNoviId(), lat:+(+lat).toFixed(6), lon:+(+lon).toFixed(6),
+           tip:(+tip===1?1:2), naziv:(naziv||"").trim()||"Moja oznaka"};
+  CFG.moji.push(m);
+  if(lim) CFG.lim[m.id]=+lim;
+  save(); mojeUR(); refreshLim(); mojeOsvjezi(); drawMap();
+  return m;
+}
+function mojObrisi(id){
+  CFG.moji=CFG.moji.filter(m=>m.id!==id);
+  delete CFG.lim[id];
+  const i=R.findIndex(r=>r.id===id); if(i>=0) R.splice(i,1);
+  save(); refreshLim(); mojeOsvjezi();
+  if(sel&&sel.id===id){ sel=null; $("mapinfo").hidden=true; layoutRecenter(); }
+  drawMap();
+}
+mojeUR();
 
 /* ================= ZVUK ================= */
 let sound=true, ac=null;
@@ -781,6 +835,16 @@ function drawMap(){
     }
     ctx.fillStyle=TIP[r.tip].c; ctx.fill();
     ctx.lineWidth=2*dpr; ctx.strokeStyle=on?"#fff":"#0d141d"; ctx.stroke();
+    if(r.moj){
+      /* Tamna podloga pa bijele crtice preko nje - prsten se tako cita
+         i na svijetloj mapi i na satelitu i na nocnoj podlozi. */
+      const rr=sz+4.5*dpr;
+      ctx.beginPath(); ctx.arc(0,0,rr,0,7);
+      ctx.lineWidth=3.5*dpr; ctx.strokeStyle="rgba(13,20,29,.8)"; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0,0,rr,0,7);
+      ctx.setLineDash([3*dpr,3*dpr]); ctx.lineWidth=1.8*dpr;
+      ctx.strokeStyle="#fff"; ctx.stroke(); ctx.setLineDash([]);
+    }
     ctx.restore();
   });
 
@@ -841,6 +905,34 @@ function setLayer(i){
   drawMap();
 }
 buildLayers();
+/* Nova oznaka se pise na GPS poziciju ako pracenje radi, inace na
+   sredinu mape - da moze i naknadno, kad se covjek vrati kuci. */
+function dodajFormu(){
+  const gps=!!lastFix;
+  const la=gps?lastFix.lat:mlat, lo=gps?lastFix.lon:mlon;
+  sel=null;
+  const box=$("mapinfo"); box.hidden=false;
+  box.innerHTML='<span class="x" id="mx">×</span><b>Nova oznaka</b>'+
+    '<small>'+(gps?"GPS pozicija":"sredina mape")+' · '+la.toFixed(5)+', '+lo.toFixed(5)+'</small>'+
+    '<div class="lim"><input type="text" id="nNaziv" class="wide" placeholder="naziv, npr. Kod pumpe u Danilovgradu"></div>'+
+    '<div class="lim"><select id="nTip">'+
+      '<option value="2">Stacionarni radar</option>'+
+      '<option value="1">Kamera na raskrsnici</option></select>'+
+      '<input type="number" id="nLim" min="10" max="140" step="5" value="60"><span>km/h</span></div>'+
+    '<div class="lim"><button class="primary" id="nOk">Sačuvaj</button><button id="nNe">Odustani</button></div>';
+  const zatvori=()=>{ box.hidden=true; layoutRecenter(); drawMap(); };
+  $("mx").onclick=zatvori;
+  $("nNe").onclick=zatvori;
+  $("nOk").onclick=()=>{
+    const m=mojDodaj(la,lo,$("nTip").value,$("nNaziv").value,$("nLim").value);
+    zatvori(); showOnMap(R.find(r=>r.id===m.id));
+    beep(1,880);
+  };
+  $("nTip").onchange=e=>{ $("nLim").value = e.target.value==="1"?50:60; };
+  layoutRecenter();
+}
+$("addBtn").onclick=dodajFormu;
+
 $("layBtn").onclick=()=>$("layBtn").setAttribute("aria-expanded",$("layers").classList.toggle("on"));
 $("rotBtn").onclick=()=>{
   headUp=!headUp; CFG.headUp=headUp; save();
@@ -924,6 +1016,11 @@ function info(r){
   box.innerHTML='<span class="x" id="mx">×</span><b>'+r.naziv+'</b><small>'+TIP[r.tip].k+' · '+r.grad+'</small>'+
     '<div class="lim"><input type="number" id="mLim" min="10" max="140" step="5" value="'+limOf(r)+'"><span>km/h ograničenje</span></div>'+
     (s?'<div class="lim"><input type="number" id="mLen" min="100" step="50" value="'+lenOf(s)+'"><span>m dužina dionice</span></div>':'');
+  if(r.moj){
+    box.insertAdjacentHTML("beforeend",
+      '<div class="lim"><button id="mDel">Obriši oznaku</button></div>');
+    $("mDel").onclick=()=>mojObrisi(r.id);
+  }
   $("mx").onclick=()=>{box.hidden=true;sel=null;layoutRecenter();drawMap();};
   layoutRecenter();
   $("mLim").onchange=e=>{CFG.lim[r.id]=+e.target.value||DEF[r.tip];save();refreshLim();};
@@ -1055,7 +1152,61 @@ $("limList").addEventListener("click",e=>{
   showOnMap(R.find(x=>x.id===+b.dataset.go));
 });
 $("q").addEventListener("input",refreshLim);
+
+function mojeOsvjezi(){
+  const n=CFG.moji.length;
+  $("mojeBroj").textContent=n===0?"nema ih":(n+(n===1?" oznaka":n<5?" oznake":" oznaka"));
+}
+$("mojeIzvoz").onclick=async()=>{
+  const t=$("mojeJson");
+  if(!CFG.moji.length){ $("mojePoruka").textContent="Nemaš još nijednu svoju oznaku."; return; }
+  /* Ogranicenje se cuva odvojeno po id-u, pa se uz izvoz mora spakovati
+     u samu oznaku - inace se posle uvoza vrati na podrazumijevano. */
+  t.hidden=false;
+  t.value=JSON.stringify(CFG.moji.map(m=>Object.assign({},m,{lim:limOf(m)})));
+  t.focus(); t.select();
+  let poruka="Tekst je ispod, označen — kopiraj ga i sačuvaj.";
+  try{ await navigator.clipboard.writeText(t.value); poruka="Kopirano. Tekst je i ispod, za svaki slučaj."; }catch(e){}
+  $("mojePoruka").textContent=poruka;
+};
+$("mojeUvoz").onclick=()=>{
+  const t=$("mojeJson");
+  if(t.hidden||!t.value.trim()){ t.hidden=false; t.value=""; t.focus();
+    $("mojePoruka").textContent="Zalijepi tekst u polje pa ponovo pritisni Uvezi."; return; }
+  let ulaz;
+  try{ ulaz=JSON.parse(t.value); }catch(e){ $("mojePoruka").textContent="Tekst nije ispravan — očekujem ono što je dalo Izvezi."; return; }
+  if(!Array.isArray(ulaz)){ $("mojePoruka").textContent="Tekst nije spisak oznaka."; return; }
+  let dodato=0, preskoceno=0;
+  ulaz.forEach(m=>{
+    const ok=m&&isFinite(m.lat)&&isFinite(m.lon)&&Math.abs(m.lat)<=90&&Math.abs(m.lon)<=180;
+    if(!ok){ preskoceno++; return; }
+    /* Oznaka na manje od 25 m od postojece se smatra istom. */
+    if(R.some(r=>dist(r.lat,r.lon,m.lat,m.lon)<25)){ preskoceno++; return; }
+    mojDodaj(m.lat,m.lon,m.tip,m.naziv,m.lim); dodato++;
+  });
+  $("mojePoruka").textContent="Dodato "+dodato+(preskoceno?", preskočeno "+preskoceno+" (već postoje ili neispravne)":"")+".";
+  t.hidden=true; t.value="";
+};
+let brisiPotvrda=0;
+$("mojeBrisi").onclick=e=>{
+  const b=e.currentTarget;
+  if(!CFG.moji.length){ $("mojePoruka").textContent="Nema šta da se briše."; return; }
+  if(Date.now()>brisiPotvrda){            /* prvi dodir samo pita */
+    brisiPotvrda=Date.now()+5000;
+    b.textContent="Stvarno obriši sve?";
+    $("mojePoruka").textContent="Ovo briše svih "+CFG.moji.length+" tvojih oznaka i ne može se opozvati. "+
+      "Ako ih nisi izvezao, prvo pritisni Izvezi. Potvrdi ponovnim dodirom.";
+    setTimeout(()=>{ if(Date.now()>brisiPotvrda){ b.textContent="Obriši sve"; } },5200);
+    return;
+  }
+  brisiPotvrda=0; b.textContent="Obriši sve";
+  const n=CFG.moji.length;
+  CFG.moji.slice().forEach(m=>mojObrisi(m.id));
+  $("mojePoruka").textContent="Obrisano "+n+". Ako ti zatrebaju, vrati ih preko Uvezi.";
+};
+
 refreshLim();
+mojeOsvjezi();
 
 /* ================= KONTROLE ================= */
 $("startBtn").onclick=()=>watchId?stop():start();
