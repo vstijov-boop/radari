@@ -50,6 +50,22 @@
     border-radius:8px;padding:8px;font:inherit;text-align:center}
   .mapinfo .x{position:absolute;right:10px;top:8px;color:var(--dim);font-size:20px;padding:4px 8px;cursor:pointer}
 
+  /* --- navigacijski sloj mape --- */
+  .maphud{position:absolute;left:10px;top:10px;pointer-events:none;
+    background:rgba(20,30,43,.92);border:1px solid var(--line);border-radius:12px;padding:8px 13px}
+  .maphud b{font-size:26px;line-height:1.05;display:block}
+  .maphud b.over{color:var(--alert)}
+  .maphud u{text-decoration:none;color:var(--dim);font-size:11.5px}
+  .maphud .tgt{color:var(--warn);font-size:12.5px;margin-top:3px}
+  .recenter{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:2;
+    background:rgba(20,30,43,.96);border-color:var(--blue);color:var(--blue);
+    border-radius:22px;padding:10px 18px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .layers{position:absolute;right:10px;top:158px;display:none;flex-direction:column;gap:3px;
+    background:rgba(20,30,43,.96);border:1px solid var(--line);border-radius:12px;padding:6px}
+  .layers.on{display:flex}
+  .layers button{padding:9px 14px;font-size:13px;text-align:left;background:transparent;border:0}
+  .layers button[aria-pressed="true"]{background:var(--blue);color:#06182b;font-weight:600}
+
   .hud{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;transition:background .2s,border-color .2s}
   .hud.near{background:#2a2410;border-color:var(--warn)}
   .hud.hot{background:#2e1412;border-color:var(--alert)}
@@ -158,12 +174,21 @@
 <!-- MAPA -->
 <section class="view" id="mapView">
   <canvas id="map"></canvas>
+
+  <div class="maphud" id="maphud" hidden>
+    <b id="mKmh">—</b><u>km/h</u>
+    <div class="tgt" id="mTgt"></div>
+  </div>
+
   <div class="mapctl">
     <button id="zin" title="Uvećaj">+</button>
     <button id="zout" title="Umanji">−</button>
-    <button id="mefollow" title="Centriraj na mene">◎</button>
+    <button id="layBtn" title="Vrsta mape" aria-expanded="false">🗺</button>
   </div>
+  <div class="layers" id="layers"></div>
+
   <div class="mapinfo" id="mapinfo" hidden></div>
+  <button class="recenter" id="mefollow" hidden>◎ Centriraj</button>
 </section>
 
 <!-- OGRANIČENJA -->
@@ -340,6 +365,7 @@ function start(){
   $("startBtn").textContent="Zaustavi praćenje";$("startBtn").classList.remove("primary");
   $("dot").className="dot live";$("status").textContent="čekam signal…";
   if("wakeLock" in navigator)navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{});
+  goTab("mapView"); follow=true; $("maphud").hidden=false;
 }
 function stop(){
   navigator.geolocation.clearWatch(watchId);watchId=null;active=null;lastFix=null;
@@ -348,6 +374,7 @@ function stop(){
   $("target").hidden=true;$("idle").hidden=false;$("hud").className="hud";
   $("secBox").hidden=true;$("kmh").textContent="—";$("speedBox").classList.remove("over");
   R.forEach(r=>r.st=0);
+  $("maphud").hidden=true; $("mefollow").hidden=true;
   if(wake){wake.release();wake=null;}
 }
 function onErr(e){$("dot").className="dot err";
@@ -464,6 +491,13 @@ function render(near,kmh){
     $("idle").hidden=false;$("idle").textContent="Nema radara ispred vozila u radijusu od 6 km.";
     $("target").hidden=true;$("hud").className="hud";$("speedBox").classList.remove("over");
   }
+  const L0=t?limOf(t):0;
+  $("mKmh").textContent=kmh<2?"0":Math.round(kmh);
+  $("mKmh").className=(t&&kmh>L0+5&&t.d<1500)?"over":"";
+  $("mTgt").textContent=t
+    ? (t.d<950?Math.round(t.d/10)*10+" m":(t.d/1000).toFixed(1)+" km")+" · "+TIP[t.tip].k+" · "+L0+" km/h"
+    : "nema radara ispred";
+
   $("list").innerHTML=near.slice(0,8).map(r=>
     '<li class="'+(r.ahead?"ahead":"")+'"><span class="m">'+(r.d<950?Math.round(r.d)+" m":(r.d/1000).toFixed(1)+" km")+
     '</span><span class="t"><b>'+r.naziv+'</b>'+TIP[r.tip].k+' · '+limOf(r)+' km/h</span>'+
@@ -477,6 +511,17 @@ function render(near,kmh){
 const cv=$("map"), ctx=cv.getContext("2d"), TS=256;
 let mz=8, mlat=42.6, mlon=19.2, mapOn=false, follow=true, sel=null, raf=0;
 const tiles=new Map();
+
+/* Slojevi podloge. Esri ima red /z/y/x — obrnuto od ostalih. */
+const LAYERS=[
+  {id:"osm",  name:"Mapa",    max:19, attr:"© OpenStreetMap",
+   url:(z,x,y)=>"https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png"},
+  {id:"sat",  name:"Satelit", max:18, attr:"Esri · Maxar · Earthstar Geographics",
+   url:(z,x,y)=>"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"+z+"/"+y+"/"+x},
+  {id:"night",name:"Noćna",   max:16, attr:"Esri · HERE · Garmin · © OpenStreetMap",
+   url:(z,x,y)=>"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/"+z+"/"+y+"/"+x}
+];
+let layIdx=Math.max(0,LAYERS.findIndex(l=>l.id===CFG.layer));
 
 const wx=(lon,z)=>(lon+180)/360*TS*Math.pow(2,z);
 const wy=(lat,z)=>{const s=Math.sin(lat*RAD);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*TS*Math.pow(2,z);};
@@ -499,13 +544,13 @@ function sizeMap(){
 function tile(z,x,y){
   const n=1<<z; if(y<0||y>=n)return null;
   x=((x%n)+n)%n;
-  const k=z+"/"+x+"/"+y;
+  const L=LAYERS[layIdx], k=L.id+"/"+z+"/"+x+"/"+y;
   let im=tiles.get(k);
   if(im===undefined){
     im=new Image(); im.crossOrigin="anonymous";
     im.onload=()=>{im.ok=true;queueDraw();};
     im.onerror=()=>{im.ok=false;};
-    im.src="https://tile.openstreetmap.org/"+k+".png";
+    im.src=L.url(z,x,y);
     tiles.set(k,im);
     if(tiles.size>500){const it=tiles.keys();for(let i=0;i<100;i++)tiles.delete(it.next().value);}
   }
@@ -555,12 +600,42 @@ function drawMap(){
     }
   }
 
-  ctx.font=(11*dpr)+"px system-ui";ctx.fillStyle="rgba(232,238,246,.55)";ctx.textAlign="right";
-  ctx.fillText("© OpenStreetMap · zum "+mz, W-8*dpr, H-8*dpr);
-  ctx.textAlign="left";
+  ctx.font=(11*dpr)+"px system-ui";ctx.fillStyle="rgba(232,238,246,.72)";ctx.textAlign="right";
+  ctx.shadowColor="rgba(0,0,0,.85)";ctx.shadowBlur=4*dpr;
+  ctx.fillText(LAYERS[layIdx].attr+" · zum "+mz, W-8*dpr, H-8*dpr);
+  ctx.shadowBlur=0;ctx.textAlign="left";
 }
 
-function zoomTo(z){ mz=Math.max(3,Math.min(18,z)); drawMap(); }
+function zoomTo(z){ mz=Math.max(3,Math.min(LAYERS[layIdx].max,z)); drawMap(); }
+
+/* ---- izbor podloge ---- */
+function buildLayers(){
+  $("layers").innerHTML=LAYERS.map((l,i)=>
+    '<button data-l="'+i+'" aria-pressed="'+(i===layIdx)+'">'+l.name+'</button>').join("");
+}
+function setLayer(i){
+  layIdx=i; CFG.layer=LAYERS[i].id; save();
+  if(mz>LAYERS[i].max)mz=LAYERS[i].max;
+  buildLayers();
+  $("layers").classList.remove("on"); $("layBtn").setAttribute("aria-expanded","false");
+  drawMap();
+}
+buildLayers();
+$("layBtn").onclick=()=>$("layBtn").setAttribute("aria-expanded",$("layers").classList.toggle("on"));
+$("layers").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-l]"); if(b) setLayer(+b.dataset.l);
+});
+
+/* ---- praćenje pozicije / dugme Centriraj ---- */
+function setFollow(v){
+  follow=v;
+  $("mefollow").hidden = v || !lastFix;
+  layoutRecenter();
+}
+function layoutRecenter(){
+  const box=$("mapinfo");
+  $("mefollow").style.bottom = box.hidden ? "14px" : (box.offsetHeight+20)+"px";
+}
 
 function bindMapGestures(){
   let pts=new Map(), moved=0, base=0, last=null;
@@ -581,7 +656,7 @@ function bindMapGestures(){
     if(!last)return;
     const dx=e.clientX-last.x, dy=e.clientY-last.y;
     last={x:e.clientX,y:e.clientY}; moved+=Math.abs(dx)+Math.abs(dy);
-    if(moved>6)follow=false;
+    if(moved>6)setFollow(false);
     const sc=TS*Math.pow(2,mz);
     mlon=ilon(wx(mlon,mz)-dx,mz);
     mlat=ilat(Math.max(0,Math.min(sc,wy(mlat,mz)-dy)),mz);
@@ -593,7 +668,7 @@ function bindMapGestures(){
   };
   cv.addEventListener("pointerup",up);
   cv.addEventListener("pointercancel",e=>{pts.delete(e.pointerId);base=0;});
-  cv.addEventListener("wheel",e=>{e.preventDefault();follow=false;zoomTo(mz+(e.deltaY<0?1:-1));},{passive:false});
+  cv.addEventListener("wheel",e=>{e.preventDefault();setFollow(false);zoomTo(mz+(e.deltaY<0?1:-1));},{passive:false});
   cv.addEventListener("dblclick",e=>{e.preventDefault();zoomTo(mz+1);});
 }
 
@@ -605,7 +680,7 @@ function pick(cx,cy){
     const d=Math.hypot(wx(r.lon,mz)-ox-px, wy(r.lat,mz)-oy-py);
     if(d<bd){bd=d;best=r;}
   });
-  if(bd<22){sel=best;info(best);}else{sel=null;$("mapinfo").hidden=true;}
+  if(bd<22){sel=best;info(best);}else{sel=null;$("mapinfo").hidden=true;layoutRecenter();}
   drawMap();
 }
 
@@ -615,14 +690,15 @@ function info(r){
   box.innerHTML='<span class="x" id="mx">×</span><b>'+r.naziv+'</b><small>'+TIP[r.tip].k+' · '+r.grad+'</small>'+
     '<div class="lim"><input type="number" id="mLim" min="10" max="140" step="5" value="'+limOf(r)+'"><span>km/h ograničenje</span></div>'+
     (s?'<div class="lim"><input type="number" id="mLen" min="100" step="50" value="'+lenOf(s)+'"><span>m dužina dionice</span></div>':'');
-  $("mx").onclick=()=>{box.hidden=true;sel=null;drawMap();};
+  $("mx").onclick=()=>{box.hidden=true;sel=null;layoutRecenter();drawMap();};
+  layoutRecenter();
   $("mLim").onchange=e=>{CFG.lim[r.id]=+e.target.value||DEF[r.tip];save();refreshLim();};
   if(s)$("mLen").onchange=e=>{CFG.len[s.id]=+e.target.value||s.base;save();refreshLim();};
 }
 
 $("zin").onclick=()=>zoomTo(mz+1);
 $("zout").onclick=()=>zoomTo(mz-1);
-$("mefollow").onclick=()=>{follow=true;if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;if(mz<13)mz=15;}drawMap();};
+$("mefollow").onclick=()=>{if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;if(mz<13)mz=15;}setFollow(true);drawMap();};
 
 /* ================= OGRANIČENJA ================= */
 function refreshLim(){
@@ -662,7 +738,7 @@ function goTab(v){
 function showOnMap(r){
   if(!r)return;
   goTab("mapView"); initMap();
-  follow=false; sel=r; mlat=r.lat; mlon=r.lon; if(mz<15)mz=15;
+  setFollow(false); sel=r; mlat=r.lat; mlon=r.lon; if(mz<15)mz=15;
   info(r);
   setTimeout(()=>{sizeMap();drawMap();},60);
 }
