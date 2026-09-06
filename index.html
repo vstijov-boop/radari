@@ -115,6 +115,15 @@
   .search{width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);
     border-radius:10px;padding:12px 14px;font:inherit}
   .hint{font-size:12.5px;color:var(--dim);line-height:1.5;padding:0 2px;margin:0}
+  .vrsta{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+  .vrsta h3{margin:0 0 8px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .vrsta h3 em{font-style:normal;font-size:12px;font-weight:500;color:var(--dim);margin-left:auto}
+  .mk{width:19px;height:19px;flex:none}
+  .tipoznaka{margin:0 0 10px;font-size:10.5px;letter-spacing:.7px;color:var(--blue)}
+  ul.fn{margin:12px 0 0;gap:0}
+  ul.fn li{display:list-item;background:none;border:0;border-top:1px solid var(--line);
+    border-radius:0;padding:8px 2px;font-size:13px;color:var(--dim)}
+  ul.fn li.key{color:var(--ink);font-weight:600}
   .offbtns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   .offbtns .primary{flex:0 0 auto}
 
@@ -123,7 +132,7 @@
     border:1px solid var(--line);border-radius:10px;padding:11px 14px;cursor:pointer}
   button.primary{background:var(--ok);border-color:var(--ok);color:#06210f;font-weight:600;flex:1}
   .tabs{display:flex;border-top:1px solid var(--line);background:var(--bg)}
-  .tabs button{flex:1;border:0;border-radius:0;background:none;color:var(--dim);padding:12px 4px;font-size:13px}
+  .tabs button{flex:1;border:0;border-radius:0;background:none;color:var(--dim);padding:12px 2px;font-size:11.5px}
   .tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 2px 0 var(--ok)}
   .toggle[aria-pressed="true"]{background:#24405c;border-color:#3d6488}
   @media (prefers-reduced-motion:no-preference){.dot.live{animation:p 2s ease-in-out infinite}}
@@ -231,6 +240,72 @@
   </div>
 </section>
 
+<!-- VRSTE -->
+<section class="view" id="vrsteView">
+  <p class="hint">Podaci su iz idejnog tehničkog rješenja (SAT-TRAKT, v8). Za svaku lokaciju
+    tamo stoji traka <b>SYSTEM REQUIREMENTS</b> — ona je vezana za vrstu lokacije i po njoj je
+    napravljen ovaj pregled. Broj lokacija po vrsti odgovara bazi u aplikaciji.</p>
+
+  <div class="vrsta">
+    <h3><svg class="mk" viewBox="-12 -12 24 24"><rect x="-8" y="-8" width="16" height="16"
+      fill="#4a90d9" stroke="#0d141d" stroke-width="2"/></svg>
+      Kamera na raskrsnici <em>5 lokacija</em></h3>
+    <p class="tipoznaka">INTERSECTION ENFORCEMENT</p>
+    <p class="hint">Radi sve što i stacionarni radar, i uz to je jedina vrsta koja hvata
+      <b>prolazak kroz crveno svjetlo</b>. Postavlja se u više kamera po raskrsnici, po jedna na traku.</p>
+    <ul class="fn">
+      <li class="key">Prolazak kroz crveno svjetlo</li>
+      <li>Trenutna brzina</li>
+      <li>Nepropisno zaustavljanje i parkiranje</li>
+      <li>Nepropisna traka i nepropisno skretanje</li>
+      <li>Čitanje registarskih oznaka</li>
+      <li>Sigurnosni pojas · mobilni telefon · kaciga</li>
+      <li>Detekcija i klasifikacija vozila</li>
+    </ul>
+  </div>
+
+  <div class="vrsta">
+    <h3><svg class="mk" viewBox="-12 -12 24 24"><circle r="8.5"
+      fill="#e8352a" stroke="#0d141d" stroke-width="2"/></svg>
+      Stacionarni radar <em>29 lokacija</em></h3>
+    <p class="tipoznaka">ROAD ENFORCEMENT POINT</p>
+    <p class="hint">Jedna tačka na otvorenom putu, obično jedna kamera. Mjeri brzinu u prolazu.
+      <b>Nema kontrole crvenog svjetla</b> — to je jedina razlika u odnosu na raskrsnicu.</p>
+    <ul class="fn">
+      <li class="key">Trenutna brzina</li>
+      <li>Nepropisno zaustavljanje i parkiranje</li>
+      <li>Nepropisna traka i nepropisno skretanje</li>
+      <li>Čitanje registarskih oznaka</li>
+      <li>Sigurnosni pojas · mobilni telefon · kaciga</li>
+      <li>Detekcija i klasifikacija vozila</li>
+    </ul>
+  </div>
+
+  <div class="vrsta">
+    <h3><svg class="mk" viewBox="-12 -12 24 24"><path d="M0 -9 L9 6 L-9 6 Z"
+      fill="#39c07a" stroke="#0d141d" stroke-width="2"/></svg><svg class="mk" viewBox="-12 -12 24 24"
+      ><path d="M0 9 L9 -6 L-9 -6 Z" fill="#39c07a" stroke="#0d141d" stroke-width="2"/></svg>
+      Sekcijsko mjerenje <em>27 dionica</em></h3>
+    <p class="tipoznaka">AVERAGE SPEED CONTROL · POINT A / POINT B</p>
+    <p class="hint">Dvije tačke na istoj dionici. Vrijeme između njih dijeli se dužinom puta i tako
+      se dobija <b>prosječna brzina</b> — usporavanje samo pred kamerom tu ne pomaže. Trougao nagore
+      je ulaz, trougao nadolje izlaz. <b>Nema kontrole crvenog svjetla.</b></p>
+    <ul class="fn">
+      <li class="key">Prosječna brzina na cijeloj dionici</li>
+      <li>Trenutna brzina na svakoj tački</li>
+      <li>Nepropisno preticanje</li>
+      <li>Čitanje registarskih oznaka</li>
+      <li>Sigurnosni pojas · mobilni telefon · kaciga</li>
+      <li>Detekcija i klasifikacija vozila</li>
+    </ul>
+  </div>
+
+  <p class="hint">Napomena o izvoru: pored trake SYSTEM REQUIREMENTS, svaka strana ima i opšti
+    spisak „ZAHTIJEVANI SISTEMI / FUNKCIJE“. Taj spisak je na svim stranama praktično isti i navodi
+    prolazak kroz crveno svjetlo i tamo gdje ga traka ne predviđa — djeluje kao tipski tekst.
+    Ovdje sam se držao trake, jer se ona razlikuje po vrsti lokacije.</p>
+</section>
+
 <footer>
   <button class="primary" id="startBtn">Pokreni praćenje</button>
   <button class="toggle" id="soundBtn" aria-pressed="true">🔊</button>
@@ -242,6 +317,7 @@
   <button aria-selected="false" data-v="mapView">Mapa</button>
   <button aria-selected="false" data-v="limView">Ograničenja</button>
   <button aria-selected="false" data-v="offView">Offline</button>
+  <button aria-selected="false" data-v="vrsteView">Vrste</button>
 </nav>
 
 <script>
@@ -644,13 +720,28 @@ function drawMap(){
     ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();});
   ctx.setLineDash([]);
 
+  /* Svaka vrsta ima svoj oblik, ne samo boju: kvadrat = raskrsnica,
+     krug = stacionarni, trougao gore/dolje = ulaz/izlaz sekcijske dionice.
+     Oblici se kontra-rotiraju da ostanu uspravni kad je mapa zaokrenuta. */
   R.forEach(r=>{
     const p=P(r.lat,r.lon);
     if(p[0]<bx0-20||p[1]<by0-20||p[0]>bx1+20||p[1]>by1+20)return;
-    const rad=(sel&&sel.id===r.id?10:7)*dpr;
-    ctx.beginPath();ctx.arc(p[0],p[1],rad,0,7);
-    ctx.fillStyle=TIP[r.tip].c;ctx.fill();
-    ctx.lineWidth=2*dpr;ctx.strokeStyle=sel&&sel.id===r.id?"#fff":"#0d141d";ctx.stroke();
+    const on=sel&&sel.id===r.id, sz=(on?9.5:7.5)*dpr;
+    ctx.save();
+    ctx.translate(p[0],p[1]);
+    if(rot) ctx.rotate(-rad);
+    ctx.beginPath();
+    if(r.tip===1){
+      const q=sz*0.92; ctx.rect(-q,-q,q*2,q*2);
+    }else if(r.tip===2){
+      ctx.arc(0,0,sz,0,7);
+    }else{
+      const d=(r.tip===3?-1:1), h=sz*1.2, w=sz*1.1;
+      ctx.moveTo(0,d*h); ctx.lineTo(w,-d*h*0.7); ctx.lineTo(-w,-d*h*0.7); ctx.closePath();
+    }
+    ctx.fillStyle=TIP[r.tip].c; ctx.fill();
+    ctx.lineWidth=2*dpr; ctx.strokeStyle=on?"#fff":"#0d141d"; ctx.stroke();
+    ctx.restore();
   });
 
   if(lastFix){
