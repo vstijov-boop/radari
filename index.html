@@ -555,6 +555,9 @@ const LAYERS=[
 let layIdx=Math.max(0,LAYERS.findIndex(l=>l.id===CFG.layer));
 let autoZoom=true;
 
+/* Okvir Crne Gore - odreduje i najmanji dozvoljeni zum i plan offline mape. */
+const MNE={n:43.58,s:41.82,w:18.40,e:20.40};
+
 const wx=(lon,z)=>(lon+180)/360*TS*Math.pow(2,z);
 const wy=(lat,z)=>{const s=Math.sin(lat*RAD);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*TS*Math.pow(2,z);};
 const ilon=(x,z)=>x/(TS*Math.pow(2,z))*360-180;
@@ -564,8 +567,9 @@ function initMap(){
   if(mapOn)return; mapOn=true;
   sizeMap();
   if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;mz=14;}
-  addEventListener("resize",()=>{sizeMap();drawMap();});
+  addEventListener("resize",()=>{sizeMap();clampZoom();drawMap();});
   bindMapGestures();
+  clampZoom();
   drawMap();
 }
 function sizeMap(){
@@ -638,7 +642,22 @@ function drawMap(){
   ctx.shadowBlur=0;ctx.textAlign="left";
 }
 
-function zoomTo(z){ mz=Math.max(3,Math.min(LAYERS[layIdx].max,z)); drawMap(); }
+/* Najdalje sto se moze odzumirati: zum na kojem cijela Crna Gora jos staje
+   na ekran. Racuna se iz stvarne velicine platna, pa je tacno i na telefonu
+   i na sirokom ekranu; okolina koja pretekne dolazi sama od odnosa stranica. */
+function minZoom(){
+  const r=cv.getBoundingClientRect(), W=r.width, H=r.height;
+  if(W<10||H<10) return 8;
+  const M=1.0;
+  let best=3;
+  for(let z=3;z<=16;z++){
+    const w=(wx(MNE.e,z)-wx(MNE.w,z))*M, h=(wy(MNE.s,z)-wy(MNE.n,z))*M;
+    if(w<=W&&h<=H) best=z;
+  }
+  return best;
+}
+function clampZoom(){ const lo=minZoom(); if(mz<lo)mz=lo; if(mz>LAYERS[layIdx].max)mz=LAYERS[layIdx].max; }
+function zoomTo(z){ mz=Math.max(minZoom(),Math.min(LAYERS[layIdx].max,z)); drawMap(); }
 function manualZoom(z){ autoZoom=false; zoomTo(z); }
 /* Brze vozis - vidis dalje ispred sebe. */
 const zoomForSpeed=kmh => kmh<30?16 : kmh<60?15 : kmh<90?14 : 13;
@@ -650,7 +669,7 @@ function buildLayers(){
 }
 function setLayer(i){
   layIdx=i; CFG.layer=LAYERS[i].id; save();
-  if(mz>LAYERS[i].max)mz=LAYERS[i].max;
+  clampZoom();
   buildLayers();
   $("layers").classList.remove("on"); $("layBtn").setAttribute("aria-expanded","false");
   drawMap();
@@ -740,7 +759,6 @@ $("mefollow").onclick=()=>{autoZoom=true;if(lastFix){mlat=lastFix.lat;mlon=lastF
    Detaljni zumovi se rade samo oko radara jer bi cijela Crna Gora na z15
    bila desetine hiljada pločica, a ionako je bitno samo ono uz put. */
 const TILE_CACHE="radari-tiles-v1";
-const MNE={n:43.58,s:41.82,w:18.40,e:20.40};
 let offAbort=false, offBusy=false;
 
 function boxTiles(z,b){
