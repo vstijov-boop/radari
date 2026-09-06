@@ -52,6 +52,10 @@
     border-radius:8px;padding:8px;font:inherit;flex:1;min-width:0}
   .mapinfo input.wide{width:100%}
   .mapinfo .lim button{padding:9px 13px}
+  .mapinfo .raskr{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  .mapinfo .raskr b{font-size:13px;margin-bottom:3px}
+  .mapinfo .raskr span{display:block;font-size:12px;color:var(--dim);line-height:1.45}
+  .mapinfo .raskr .st{margin-top:5px;color:var(--blue)}
   .mapinfo .x{position:absolute;right:10px;top:8px;color:var(--dim);font-size:20px;padding:4px 8px;cursor:pointer}
 
   /* --- navigacijski sloj mape --- */
@@ -480,6 +484,17 @@ try{const s=localStorage.getItem("radari.cfg"); if(s) CFG=Object.assign(CFG,JSON
 function save(){try{localStorage.setItem("radari.cfg",JSON.stringify(CFG));}catch(e){}}
 const limOf=r=>CFG.lim[r.id]||DEF[r.tip];
 const lenOf=s=>CFG.len[s.id]||s.base;
+
+/* Sastav opreme po raskrsnici, prepisan iz idejnog rjesenja.
+   Dvije od pet raskrsnica su u dokumentu oznacene kao neobradjene -
+   tip je INTERSECTION ENFORCEMENT, ali raspored opreme jos ne postoji. */
+const RASKR={
+  1:{st:"završeno", par:4, ure:"4× ENGINE CELERITAS MVD 2022I (traka 3) i 4× Vista EnVES10-4M-CTX (traka 2)"},
+  2:{st:"završeno", par:4, ure:"4× ENGINE CELERITAS MVD 2022I (traka 3) i 4× Vista EnVES10-4M-CTX (traka 2)"},
+  3:{st:"završeno", par:4, ure:"4× ENGINE CELERITAS MVD 2022I (traka 3) i 4× Vista EnVES10-4M-CTX (traka 2)"},
+ 11:{st:"nije obrađena", par:0, ure:""},
+ 18:{st:"nije obrađena", par:0, ure:""}
+};
 
 /* ============ MOJE OZNAKE (dodate sa terena) ============ */
 /* Cuvaju se u CFG-u odvojeno od zvanicne baze, a u R ulaze tek posto je
@@ -1016,6 +1031,15 @@ function info(r){
   box.innerHTML='<span class="x" id="mx">×</span><b>'+r.naziv+'</b><small>'+TIP[r.tip].k+' · '+r.grad+'</small>'+
     '<div class="lim"><input type="number" id="mLim" min="10" max="140" step="5" value="'+limOf(r)+'"><span>km/h ograničenje</span></div>'+
     (s?'<div class="lim"><input type="number" id="mLen" min="100" step="50" value="'+lenOf(s)+'"><span>m dužina dionice</span></div>':'');
+  const rk=RASKR[r.id];
+  if(rk){
+    box.insertAdjacentHTML("beforeend",
+      '<div class="raskr">'+
+      (rk.par
+        ? '<b>'+(rk.par*2)+' uređaja u '+rk.par+' para</b><span>po jedan par na svakom prilazu — '+rk.ure+'</span>'
+        : '<b>Oprema još nije projektovana</b><span>lokacija je predviđena, ali raspored uređaja u dokumentu ne postoji</span>')+
+      '<span class="st">status u projektu: '+rk.st+'</span></div>');
+  }
   if(r.moj){
     box.insertAdjacentHTML("beforeend",
       '<div class="lim"><button id="mDel">Obriši oznaku</button></div>');
