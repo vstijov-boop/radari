@@ -60,7 +60,10 @@
   .recenter{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:2;
     background:rgba(20,30,43,.96);border-color:var(--blue);color:var(--blue);
     border-radius:22px;padding:10px 18px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.45)}
-  .layers{position:absolute;right:10px;top:158px;display:none;flex-direction:column;gap:3px;
+  #rotBtn svg{width:21px;height:21px;display:block;margin:auto}
+  #rotBtn g{transform-origin:12px 12px}
+  #rotBtn[aria-pressed="false"]{border-color:var(--blue)}
+  .layers{position:absolute;right:10px;top:206px;display:none;flex-direction:column;gap:3px;
     background:rgba(20,30,43,.96);border:1px solid var(--line);border-radius:12px;padding:6px}
   .layers.on{display:flex}
   .layers button{padding:9px 14px;font-size:13px;text-align:left;background:transparent;border:0}
@@ -186,6 +189,12 @@
     <button id="zin" title="Uvećaj">+</button>
     <button id="zout" title="Umanji">−</button>
     <button id="layBtn" title="Vrsta mape" aria-expanded="false">🗺</button>
+    <button id="rotBtn" title="Sjever gore / smjer vožnje" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><g id="rotN">
+        <path d="M12 2.5 L16.6 20.5 L12 15.6 Z" fill="#e8352a"/>
+        <path d="M12 2.5 L7.4 20.5 L12 15.6 Z" fill="#8fa3bb"/>
+      </g></svg>
+    </button>
   </div>
   <div class="layers" id="layers"></div>
 
@@ -399,7 +408,7 @@ function stop(){
   $("target").hidden=true;$("idle").hidden=false;$("hud").className="hud";
   $("secBox").hidden=true;$("kmh").textContent="—";$("speedBox").classList.remove("over");
   R.forEach(r=>r.st=0);
-  $("maphud").hidden=true; $("mefollow").hidden=true;
+  $("maphud").hidden=true; $("mefollow").hidden=true; rotTarget=0;
   if(wake){wake.release();wake=null;}
 }
 function onErr(e){$("dot").className="dot err";
@@ -426,6 +435,7 @@ function onFix(pos){
     if(follow){
       mlat=lat; mlon=lon;
       if(autoZoom){const z=Math.min(zoomForSpeed(kmh),LAYERS[layIdx].max); if(z!==mz)mz=z;}
+      if(headUp&&heading!=null&&speed>1.5) rotTarget=(360-heading)%360;
     }
     queueDraw();
   }
@@ -539,7 +549,7 @@ function render(near,kmh){
 /* ============ MAPA (vlastita, bez vanjskih biblioteka) ============ */
 /* Pločice se skidaju sa OpenStreetMap-a kad ima interneta; bez njega
    ostaje tamna podloga sa radarima, dionicama i tvojom pozicijom. */
-const cv=$("map"), ctx=cv.getContext("2d"), TS=256;
+const cv=$("map"), ctx=cv.getContext("2d"), rotN=$("rotN"), TS=256;
 let mz=8, mlat=42.6, mlon=19.2, mapOn=false, follow=true, sel=null, raf=0;
 const tiles=new Map();
 
@@ -554,6 +564,9 @@ const LAYERS=[
 ];
 let layIdx=Math.max(0,LAYERS.findIndex(l=>l.id===CFG.layer));
 let autoZoom=true;
+/* rot = koliko je mapa zarotirana, u stepenima; 0 znaci sjever gore.
+   U rezimu "smjer voznje" cilj je -heading, pa pravac kretanja gleda navise. */
+let rot=0, rotTarget=0, headUp=(CFG.headUp!==false);
 
 /* Okvir Crne Gore - odreduje i najmanji dozvoljeni zum i plan offline mape. */
 const MNE={n:43.58,s:41.82,w:18.40,e:20.40};
@@ -594,6 +607,15 @@ function tile(z,x,y){
 }
 function queueDraw(){ if(!raf) raf=requestAnimationFrame(()=>{raf=0;drawMap();}); }
 
+/* Mapa se do novog ugla dovodi postepeno, i to kracim smjerom, da ne
+   napravi pun krug kad heading predje preko 360/0. */
+function stepRot(){
+  const d=((rotTarget-rot+540)%360)-180;
+  if(Math.abs(d)<0.35){ rot=(rotTarget+360)%360; return false; }
+  rot=(rot+d*0.18+360)%360;
+  return true;
+}
+
 function drawMap(){
   if(!mapOn)return;
   const dpr=window.devicePixelRatio||1, W=cv.width, H=cv.height, T=TS*dpr;
@@ -601,8 +623,16 @@ function drawMap(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle="#0a1017"; ctx.fillRect(0,0,W,H);
 
-  for(let x=Math.floor(ox/T);x<=Math.floor((ox+W)/T);x++)
-    for(let y=Math.floor(oy/T);y<=Math.floor((oy+H)/T);y++){
+  const spin=stepRot(), rad=rot*RAD;
+  /* Zarotiran ekran pokriva vecu povrsinu nego uspravan, pa se opseg
+     plocica racuna po okviru zarotiranog pravougaonika, ne po W i H. */
+  const ac=Math.abs(Math.cos(rad)), as=Math.abs(Math.sin(rad));
+  const hw=(W/2)*ac+(H/2)*as, hh=(W/2)*as+(H/2)*ac;
+  const bx0=W/2-hw, by0=H/2-hh, bx1=W/2+hw, by1=H/2+hh;
+  if(rot){ ctx.translate(W/2,H/2); ctx.rotate(rad); ctx.translate(-W/2,-H/2); }
+
+  for(let x=Math.floor((ox+bx0)/T);x<=Math.floor((ox+bx1)/T);x++)
+    for(let y=Math.floor((oy+by0)/T);y<=Math.floor((oy+by1)/T);y++){
       const im=tile(mz,x,y);
       if(im) ctx.drawImage(im,Math.round(x*T-ox),Math.round(y*T-oy),Math.ceil(T),Math.ceil(T));
     }
@@ -616,7 +646,7 @@ function drawMap(){
 
   R.forEach(r=>{
     const p=P(r.lat,r.lon);
-    if(p[0]<-20||p[1]<-20||p[0]>W+20||p[1]>H+20)return;
+    if(p[0]<bx0-20||p[1]<by0-20||p[0]>bx1+20||p[1]>by1+20)return;
     const rad=(sel&&sel.id===r.id?10:7)*dpr;
     ctx.beginPath();ctx.arc(p[0],p[1],rad,0,7);
     ctx.fillStyle=TIP[r.tip].c;ctx.fill();
@@ -636,10 +666,15 @@ function drawMap(){
     }
   }
 
+  ctx.setTransform(1,0,0,1,0,0);
+  if(rotN) rotN.style.transform="rotate("+rot.toFixed(1)+"deg)";
+
   ctx.font=(11*dpr)+"px system-ui";ctx.fillStyle="rgba(232,238,246,.72)";ctx.textAlign="right";
   ctx.shadowColor="rgba(0,0,0,.85)";ctx.shadowBlur=4*dpr;
   ctx.fillText(LAYERS[layIdx].attr+" · zum "+mz, W-8*dpr, H-8*dpr);
   ctx.shadowBlur=0;ctx.textAlign="left";
+
+  if(spin) queueDraw();
 }
 
 /* Najdalje sto se moze odzumirati: zum na kojem cijela Crna Gora jos staje
@@ -676,6 +711,14 @@ function setLayer(i){
 }
 buildLayers();
 $("layBtn").onclick=()=>$("layBtn").setAttribute("aria-expanded",$("layers").classList.toggle("on"));
+$("rotBtn").onclick=()=>{
+  headUp=!headUp; CFG.headUp=headUp; save();
+  $("rotBtn").setAttribute("aria-pressed",headUp);
+  if(!headUp) rotTarget=0;
+  else if(heading!=null) rotTarget=(360-heading)%360;
+  queueDraw();
+};
+$("rotBtn").setAttribute("aria-pressed",headUp);
 $("layers").addEventListener("click",e=>{
   const b=e.target.closest("button[data-l]"); if(b) setLayer(+b.dataset.l);
 });
@@ -711,9 +754,12 @@ function bindMapGestures(){
     const dx=e.clientX-last.x, dy=e.clientY-last.y;
     last={x:e.clientX,y:e.clientY}; moved+=Math.abs(dx)+Math.abs(dy);
     if(moved>6)setFollow(false);
+    /* Kad je mapa zarotirana, pomak prsta se prvo vrati u prostor mape. */
+    const rr=rot*RAD, cs=Math.cos(rr), sn=Math.sin(rr);
+    const wdx=dx*cs+dy*sn, wdy=-dx*sn+dy*cs;
     const sc=TS*Math.pow(2,mz);
-    mlon=ilon(wx(mlon,mz)-dx,mz);
-    mlat=ilat(Math.max(0,Math.min(sc,wy(mlat,mz)-dy)),mz);
+    mlon=ilon(wx(mlon,mz)-wdx,mz);
+    mlat=ilat(Math.max(0,Math.min(sc,wy(mlat,mz)-wdy)),mz);
     queueDraw();
   });
   const up=e=>{
@@ -729,9 +775,12 @@ function bindMapGestures(){
 function pick(cx,cy){
   const r0=cv.getBoundingClientRect(), px=cx-r0.left, py=cy-r0.top;
   const ox=wx(mlon,mz)-r0.width/2, oy=wy(mlat,mz)-r0.height/2;
+  const rr=rot*RAD, cs=Math.cos(rr), sn=Math.sin(rr);
+  const hx=r0.width/2, hy=r0.height/2;
   let best=null,bd=1e9;
   R.forEach(r=>{
-    const d=Math.hypot(wx(r.lon,mz)-ox-px, wy(r.lat,mz)-oy-py);
+    const sx=wx(r.lon,mz)-ox-hx, sy=wy(r.lat,mz)-oy-hy;
+    const d=Math.hypot(hx+sx*cs-sy*sn-px, hy+sx*sn+sy*cs-py);
     if(d<bd){bd=d;best=r;}
   });
   if(bd<22){sel=best;info(best);}else{sel=null;$("mapinfo").hidden=true;layoutRecenter();}
@@ -901,7 +950,11 @@ if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
 }
 
 document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="visible"&&watchId&&"wakeLock" in navigator)
+  if(document.visibilityState!=="visible")return;
+  /* Frejm zakazan dok je aplikacija bila u pozadini zna da ne stigne nikad.
+     Bez ovoga bi raf ostao zauzet i mapa se vise ne bi osvjezavala. */
+  if(mapOn){ raf=0; drawMap(); }
+  if(watchId&&"wakeLock" in navigator)
     navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{});
 });
 </script>
