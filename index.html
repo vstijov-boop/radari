@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="sr-Latn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d141d">
+<title>Radari · Crna Gora</title>
+<style>
+  :root{
+    --bg:#0d141d;--panel:#141e2b;--line:#243447;--ink:#e8eef6;--dim:#7d90a8;
+    --ok:#39c07a;--warn:#f2b21c;--alert:#e8352a;--blue:#4a90d9;--r:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI Variable Text","Segoe UI",Roboto,system-ui,sans-serif;
+    font-variant-numeric:tabular-nums;display:flex;flex-direction:column;overflow:hidden;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+  .dot.live{background:var(--ok);box-shadow:0 0 0 4px rgba(57,192,122,.16)}
+  .dot.err{background:var(--alert)}
+  header h1{font-size:15px;font-weight:600;margin:0}
+  header .status{margin-left:auto;font-size:12px;color:var(--dim)}
+
+  .view{flex:1;min-height:0;overflow:auto;padding:14px;display:none;flex-direction:column;gap:12px}
+  .view.on{display:flex}
+  #mapView{padding:0;position:relative}
+  #map{flex:1;min-height:0;width:100%;display:block;background:#0a1017;touch-action:none}
+  .mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+  .mapctl button{width:44px;height:44px;padding:0;font-size:19px;background:rgba(20,30,43,.92)}
+  .mapinfo{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(20,30,43,.96);
+    border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .mapinfo b{display:block;font-size:14px;margin-bottom:2px}
+  .mapinfo small{color:var(--dim);font-size:12.5px}
+  .mapinfo .lim{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .mapinfo input{width:70px;background:#0e1721;color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:8px;font:inherit;text-align:center}
+  .mapinfo .x{position:absolute;right:10px;top:8px;color:var(--dim);font-size:20px;padding:4px 8px;cursor:pointer}
+
+  .hud{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;transition:background .2s,border-color .2s}
+  .hud.near{background:#2a2410;border-color:var(--warn)}
+  .hud.hot{background:#2e1412;border-color:var(--alert)}
+  .hud .kind{font-size:13px;color:var(--dim);margin-bottom:2px}
+  .hud.near .kind,.hud.hot .kind{color:#f4dfae}
+  .hud .name{font-size:17px;font-weight:600;line-height:1.25;margin-bottom:14px}
+  .row{display:flex;align-items:flex-end;gap:14px}
+  .dist{font-size:60px;line-height:.88;font-weight:700;letter-spacing:-2px}
+  .dist small{font-size:19px;font-weight:500;color:var(--dim);letter-spacing:0;margin-left:4px}
+  .eta{font-size:13px;color:var(--dim);padding-bottom:8px}
+  .arrow{margin-left:auto;width:58px;height:58px;flex:none}
+  .idle{color:var(--dim);font-size:15px;line-height:1.5}
+  .sign{width:56px;height:56px;border-radius:50%;background:#fff;border:6px solid var(--alert);
+    display:flex;align-items:center;justify-content:center;color:#111;font-weight:700;font-size:21px;flex:none}
+
+  .speed{display:flex;align-items:baseline;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px}
+  .speed b{font-size:36px;font-weight:700;letter-spacing:-1px}
+  .speed.over b{color:var(--alert)}
+  .speed span{font-size:13px;color:var(--dim)}
+  .speed .gps{margin-left:auto;font-size:12px;color:var(--dim);text-align:right;line-height:1.4}
+
+  .sec{background:var(--panel);border:1px solid var(--blue);border-radius:var(--r);padding:14px 16px}
+  .sec.bad{border-color:var(--alert);background:#2e1412}
+  .sec h3{margin:0 0 10px;font-size:13px;font-weight:600;color:var(--blue)}
+  .sec.bad h3{color:#ffb3ad}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .grid div b{display:block;font-size:26px;font-weight:700;letter-spacing:-1px}
+  .grid div span{font-size:11.5px;color:var(--dim)}
+  .bar{height:5px;border-radius:3px;background:#1c2a3b;margin-top:12px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--ok)}
+  .sec.bad .bar i{background:var(--alert)}
+
+  h2{font-size:12px;font-weight:600;color:var(--dim);margin:4px 2px 0}
+  ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+  li{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  li.ahead{border-color:#31506e}
+  li .m{font-size:16px;font-weight:600;min-width:70px}
+  li .t{font-size:12.5px;color:var(--dim);line-height:1.35;min-width:0;flex:1}
+  li .t b{display:block;color:var(--ink);font-weight:500;font-size:13.5px}
+  li .b{font-size:12px;color:var(--dim)}
+  li input{width:58px;background:#0e1721;color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:8px;font:inherit;font-size:15px;text-align:center}
+  li button.go{padding:9px 10px;font-size:12.5px;flex:none}
+  .search{width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;font:inherit}
+  .hint{font-size:12.5px;color:var(--dim);line-height:1.5;padding:0 2px;margin:0}
+
+  footer{border-top:1px solid var(--line);padding:9px 12px;display:flex;gap:8px;align-items:center}
+  button{font:inherit;font-size:14px;font-weight:500;color:var(--ink);background:#1c2a3b;
+    border:1px solid var(--line);border-radius:10px;padding:11px 14px;cursor:pointer}
+  button.primary{background:var(--ok);border-color:var(--ok);color:#06210f;font-weight:600;flex:1}
+  .tabs{display:flex;border-top:1px solid var(--line);background:var(--bg)}
+  .tabs button{flex:1;border:0;border-radius:0;background:none;color:var(--dim);padding:12px 4px;font-size:13px}
+  .tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 2px 0 var(--ok)}
+  .toggle[aria-pressed="true"]{background:#24405c;border-color:#3d6488}
+  @media (prefers-reduced-motion:no-preference){.dot.live{animation:p 2s ease-in-out infinite}}
+  @keyframes p{50%{box-shadow:0 0 0 8px rgba(57,192,122,0)}}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>Radari · Crna Gora</h1>
+  <span class="status" id="status">GPS isključen</span>
+</header>
+
+<!-- VOŽNJA -->
+<section class="view on" id="driveView">
+  <div class="hud" id="hud">
+    <div class="idle" id="idle">Uključi praćenje i aplikacija javlja radare ispred vozila, u smjeru kretanja.</div>
+    <div id="target" hidden>
+      <div class="kind" id="kind"></div>
+      <div class="name" id="name"></div>
+      <div class="row">
+        <div class="dist" id="dist">0<small>m</small></div>
+        <div class="eta" id="eta"></div>
+        <div class="sign" id="sign" hidden>50</div>
+        <svg class="arrow" id="arrow" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#31506e" stroke-width="2"/>
+          <path id="needle" d="M50 14 L70 76 L50 63 L30 76 Z" fill="#e8eef6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" id="secBox" hidden>
+    <h3 id="secTitle">Sekcijsko mjerenje u toku</h3>
+    <div class="grid">
+      <div><b id="secAvg">0</b><span>prosjek km/h</span></div>
+      <div><b id="secReq">—</b><span>dozvoljeno do kraja</span></div>
+      <div><b id="secLeft">0</b><span>preostalo km</span></div>
+    </div>
+    <div class="bar"><i id="secBar" style="width:0%"></i></div>
+  </div>
+
+  <div class="speed" id="speedBox">
+    <b id="kmh">—</b><span>km/h</span>
+    <div class="gps" id="acc">tačnost —<br>smjer —</div>
+  </div>
+
+  <h2>Najbliži radari</h2>
+  <ul id="list"></ul>
+</section>
+
+<!-- MAPA -->
+<section class="view" id="mapView">
+  <canvas id="map"></canvas>
+  <div class="mapctl">
+    <button id="zin" title="Uvećaj">+</button>
+    <button id="zout" title="Umanji">−</button>
+    <button id="mefollow" title="Centriraj na mene">◎</button>
+  </div>
+  <div class="mapinfo" id="mapinfo" hidden></div>
+</section>
+
+<!-- OGRANIČENJA -->
+<section class="view" id="limView">
+  <input class="search" id="q" placeholder="Traži po nazivu ili gradu">
+  <p class="hint">Unesi ograničenje brzine (km/h) za svaku lokaciju. Prazno polje vraća podrazumijevanu vrijednost. Kod sekcijskih dionica dodatno se unosi stvarna dužina dionice po putu, u metrima — po njoj se računa prosječna brzina.</p>
+  <ul id="limList"></ul>
+</section>
+
+<footer>
+  <button class="primary" id="startBtn">Pokreni praćenje</button>
+  <button class="toggle" id="soundBtn" aria-pressed="true">🔊</button>
+  <button id="testBtn">Proba</button>
+</footer>
+
+<nav class="tabs">
+  <button aria-selected="true" data-v="driveView">Vožnja</button>
+  <button aria-selected="false" data-v="mapView">Mapa</button>
+  <button aria-selected="false" data-v="limView">Ograničenja</button>
+</nav>
+
+<script>
+/* ================= BAZA ================= */
+/* [id, lat, lon, tip, grad, naziv] tip: 1=raskrsnica 2=stacionarni 3=sekcijski A 4=sekcijski B */
+const R = [
+[1,42.44375,19.24581111,1,"Podgorica","Bulevar M. Lalića / S.P. Cetinjskog / Dž. Vašingtona"],
+[2,42.44116389,19.25468889,1,"Podgorica","S.P. Cetinjskog / J. Tomaševića / I. Milutinovića"],
+[3,42.44546944,19.25719722,1,"Podgorica","J. Tomaševića / 13. jula / most Milenijum"],
+[4,42.44166667,19.27483333,2,"Podgorica","Kod podvožnjaka, bulevar Ivana Crnojevića"],
+[5,42.40829722,19.24756111,2,"Podgorica","Raskrsnica sa ul. Dajbabskom, Zabjelo"],
+[6,42.37336111,19.22502778,2,"Podgorica","Crkva Svetog Đorđa, Donja Cijevna"],
+[7,42.31127778,19.20563889,3,"Podgorica","M-2 Virpazar – Podgorica, Vranjina"],
+[8,42.30597222,19.186,4,"Podgorica","M-2 Virpazar – Podgorica, Vranjina"],
+[9,42.42983333,19.27166667,2,"Podgorica","Bulevar J. B. Tita, kod A. Zmajevića, Stari Aerodrom"],
+[10,42.43806944,19.27615278,2,"Podgorica","Kod Katoličke crkve, Stari Aerodrom"],
+[11,42.46133333,19.29294444,1,"Podgorica","Bulevar Vilija Branta / ul. Branka Ćopića"],
+[12,42.41535556,19.19660833,3,"Podgorica","Kod kompleksa Vilage, M-10 Podgorica – Cetinje"],
+[13,42.41260833,19.18429444,4,"Podgorica","Raskrsnica sa priključnim putem, M-10 Podgorica – Cetinje"],
+[14,42.39580556,19.15983333,3,"Podgorica","Vuk Petrol pumpa, M-10 Podgorica – Cetinje"],
+[15,42.39341667,19.13613889,4,"Podgorica","Barutana, M-10 Podgorica – Cetinje"],
+[16,42.38311111,19.10158333,3,"Podgorica","Gospoština, M-10 Podgorica – Cetinje"],
+[17,42.38605556,19.08097222,4,"Podgorica","Gospoština, M-10 Podgorica – Cetinje"],
+[18,42.38486944,19.31217222,1,"Tuzi","Karabuško Polje, M-4 Podgorica – Tuzi"],
+[19,42.75492222,19.39178333,3,"Kolašin","Manastir Morača, M-2 Podgorica – Kolašin"],
+[20,42.74809861,19.38992556,4,"Kolašin","Manastir Morača, M-2 Podgorica – Kolašin"],
+[21,42.88484444,19.53871667,3,"Kolašin","Trebaljevo, M-2 Kolašin – Mojkovac"],
+[22,42.89619444,19.53947222,4,"Kolašin","Sjerogošte, M-2 Kolašin – Mojkovac"],
+[23,42.58705556,19.04486111,3,"Danilovgrad","Frutak, M-3 Nikšić – Danilovgrad"],
+[24,42.60140278,19.035925,4,"Danilovgrad","Kujava, M-3 Nikšić – Danilovgrad"],
+[25,42.52320556,19.15523611,3,"Danilovgrad","Kosić, R-23 Danilovgrad – Spuž"],
+[26,42.51422222,19.17017778,4,"Danilovgrad","Kosić, R-23 Danilovgrad – Spuž"],
+[27,42.37605278,19.03076667,3,"Cetinje","Jankovića krš, M-10 Podgorica – Cetinje"],
+[28,42.37728889,19.05775833,4,"Cetinje","Skretanje za groblje Meterizi, M-10 Podgorica – Cetinje"],
+[29,42.37127778,18.93452778,3,"Cetinje","Kod Kika auto, M-10 Cetinje – Budva"],
+[30,42.36111111,18.93361111,4,"Cetinje","Zagrablje, M-10 Cetinje – Budva"],
+[31,42.31738889,18.93316667,3,"Cetinje","Obzovica, M-10 Cetinje – Budva"],
+[32,42.30833333,18.93972222,4,"Cetinje","Đurđevo Ždrijelo, M-10 Cetinje – Budva"],
+[33,42.46647222,18.48347222,2,"Herceg Novi","Sutorina, M-1 GP Debeli Brijeg – Herceg Novi"],
+[34,42.45541667,18.56363056,2,"Herceg Novi","Meljine, M-1 Zelenika – Herceg Novi"],
+[35,42.45416667,18.65388889,2,"Herceg Novi","Bijela, M-1 Herceg Novi – Kamenari"],
+[36,42.49827222,18.69217028,3,"Kotor","Van naselja, M-1 Lipci – Kotor"],
+[37,42.50796667,18.69584444,4,"Kotor","Van naselja, M-1 Lipci – Kotor"],
+[38,42.39777778,18.74722222,2,"Kotor","Od kružnog toka prema tunelu, M-1 Kotor – Krtolska raskrsnica"],
+[39,42.72849167,18.60576389,3,"Kotor","Van naselja, M-8 Lipci – Grahovo"],
+[40,42.71219444,18.60725,4,"Kotor","Van naselja, M-8 Lipci – Grahovo"],
+[41,42.28579444,18.811025,3,"Budva","Van naselja, M-1 Krtolska raskrsnica – Budva"],
+[42,42.29139167,18.80739444,4,"Budva","Van naselja, M-1 Krtolska raskrsnica – Budva"],
+[43,42.25608056,18.89776111,2,"Budva","Van naselja, M-1 Budva – Petrovac"],
+[44,42.30837222,18.86673611,3,"Budva","Van naselja, M-10 Cetinje – Budva"],
+[45,42.30251389,18.87481389,4,"Budva","Van naselja, M-10 Cetinje – Budva"],
+[46,42.30858889,18.87410833,3,"Budva","Van naselja, M-10 Cetinje – Budva"],
+[47,42.30202778,18.89220833,4,"Budva","Van naselja, M-10 Cetinje – Budva"],
+[48,42.1425,19.04577778,2,"Bar","Kod supermarketa Voli, M-1 Sutomore – Bar"],
+[49,42.11738889,19.07559167,2,"Bar","Šušanj, M-1 Sutomore – Bar"],
+[50,42.09280278,19.10496944,2,"Bar","Grad Bar, bulevar na izlazu ka Ulcinju"],
+[51,42.07194444,19.12622222,2,"Bar","Zaljevo, M-1 Bar – Ulcinj"],
+[52,42.24631389,19.08907778,3,"Bar","Van naselja, M-2 Virpazar – Podgorica (kod R-28)"],
+[53,42.26044444,19.09444444,4,"Bar","Van naselja, M-2 Virpazar – Podgorica (kod R-28)"],
+[54,41.95211111,19.19282222,2,"Ulcinj","Bratic, M-1 Bar – Ulcinj"],
+[55,41.92049167,19.23734444,2,"Ulcinj","Grad Ulcinj, R-22 Ulcinj – Ada (bulevar Teuta)"],
+[56,41.90830556,19.27888889,3,"Ulcinj","Štoj, R-22 Ulcinj – Ada"],
+[57,41.90372222,19.29930556,4,"Ulcinj","Štoj, R-22 Ulcinj – Ada"],
+[58,42.44128056,18.69125278,2,"Tivat","Raskrsnica Donje Seljanovo, M-11 Lepetane – Tivat"],
+[59,42.75575556,18.94048611,2,"Nikšić","Straševina, M-3 Nikšić – Danilovgrad"],
+[60,42.67052778,18.97386111,3,"Nikšić","Cerovo, M-3 Nikšić – Danilovgrad"],
+[61,42.66190556,18.981275,4,"Nikšić","Drenovštica, M-3 Nikšić – Danilovgrad"],
+[62,42.77996389,18.90763333,2,"Nikšić","Hercegovački put, M-7 Nikšić – Vilusi"],
+[63,42.75405556,18.81605556,3,"Nikšić","Vilusi, M-6 Nikšić – Vilusi"],
+[64,42.75156667,18.78960556,4,"Nikšić","Vilusi, M-8 Nikšić – Vilusi"],
+[65,42.72627778,18.60613889,2,"Nikšić","Carine, M-8 Nikšić – Grahovo"],
+[66,42.76883333,18.94938889,2,"Nikšić","Bulevar 13. jula, preko puta Volija"],
+[67,42.80113889,18.93505278,2,"Nikšić","Mokra njiva, lokalni put Duklo – Brezovik"],
+[68,43.34827778,19.33969444,3,"Pljevlja","Radosavac, M-6 Pljevlja – Đurđevića Tara"],
+[69,43.34347222,19.32593889,4,"Pljevlja","Radosavac, M-6 Pljevlja – Đurđevića Tara"],
+[70,43.25422222,19.37305556,3,"Pljevlja","Prije Mijakovića, M-6 Pljevlja – Đurđevića Tara"],
+[71,43.24719444,19.37866667,4,"Pljevlja","Prije Mijakovića, M-6 Pljevlja – Đurđevića Tara"],
+[72,43.11402778,19.12213889,2,"Žabljak","Kulaš, M-6 Žabljak – Šavnik"],
+[73,42.90180556,19.05855556,3,"Šavnik","Donja Grabovica, M-6 Žabljak – Šavnik"],
+[74,42.895,19.06888889,4,"Šavnik","Donja Grabovica, M-6 Žabljak – Šavnik"],
+[75,42.95966944,19.57814722,2,"Mojkovac","Raskrsnica sa ul. M. Damjanovića, M-2 Kolašin – Mojkovac"],
+[76,42.99186111,19.60178056,3,"Mojkovac","Lepenac, M-2 Mojkovac – Slijepač Most"],
+[77,42.98616667,19.62227778,4,"Mojkovac","Lepenac, M-2 Mojkovac – Slijepač Most"],
+[78,43.01211111,19.73394444,2,"Bijelo Polje","Pripčići, M-2 Ribarevina – Bijelo Polje"],
+[79,43.05436111,19.77027778,2,"Bijelo Polje","Nedakusi, M-2 Bijelo Polje – Barski Most"],
+[80,43.08263889,19.77518056,3,"Bijelo Polje","Sutivan, M-2 Bijelo Polje – Barski Most"],
+[81,43.095,19.77163889,4,"Bijelo Polje","Sutivan, M-2 Bijelo Polje – Barski Most"],
+[82,42.99347222,19.80191667,3,"Bijelo Polje","Zaton, M-5 Ribarevina – Berane"],
+[83,42.97838889,19.80930556,4,"Bijelo Polje","Zaton, M-5 Ribarevina – Berane"],
+[84,42.82422222,19.86358333,3,"Berane","Buče, R-2 Berane – Andrijevica"],
+[85,42.81672222,19.85297222,4,"Berane","Buče, R-2 Berane – Andrijevica"],
+[86,42.64222222,19.93063889,2,"Plav","Liješće, R-2 Murino – Plav"],
+[87,42.8405,20.12722222,2,"Rožaje","Baza, M-5 Berane – Rožaje (Zeleni)"],
+[88,42.57047222,19.85377778,2,"Gusinje","Dosuđe, M-5 Berane – Rožaje"]
+].map(a=>({id:a[0],lat:a[1],lon:a[2],tip:a[3],grad:a[4],naziv:a[5],st:0}));
+
+const TIP={1:{k:"Kamera na raskrsnici",g:"kamera na raskrsnici",c:"#4a90d9"},
+           2:{k:"Stacionarni radar",g:"radar",c:"#e8352a"},
+           3:{k:"Sekcijsko mjerenje · ulaz",g:"početak sekcijskog mjerenja",c:"#39c07a"},
+           4:{k:"Sekcijsko mjerenje · izlaz",g:"kraj sekcijskog mjerenja",c:"#39c07a"}};
+const DEF={1:50,2:60,3:80,4:80};
+
+/* ================= GEO ================= */
+const RAD=Math.PI/180, ER=6371000;
+function dist(a,b,c,d){const p1=a*RAD,p2=c*RAD,dp=(c-a)*RAD,dl=(d-b)*RAD;
+  const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*ER*Math.asin(Math.sqrt(x));}
+function bearing(a,b,c,d){const p1=a*RAD,p2=c*RAD,dl=(d-b)*RAD;
+  const y=Math.sin(dl)*Math.cos(p2), x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return (Math.atan2(y,x)/RAD+360)%360;}
+const dAng=(a,b)=>{let d=Math.abs(a-b)%360;return d>180?360-d:d;};
+
+/* ================= SEKCIJE ================= */
+const SEC=[];
+for(let i=0;i<R.length-1;i++){
+  if(R[i].tip===3&&R[i+1].tip===4){
+    const a=R[i],b=R[i+1];
+    SEC.push({id:a.id,a,b,base:Math.round(dist(a.lat,a.lon,b.lat,b.lon)*1.05/10)*10});
+  }
+}
+const secOf=id=>SEC.find(s=>s.a.id===id||s.b.id===id);
+
+/* ================= PODEŠAVANJA ================= */
+let CFG={lim:{},len:{}};
+try{const s=localStorage.getItem("radari.cfg"); if(s) CFG=Object.assign(CFG,JSON.parse(s));}catch(e){}
+function save(){try{localStorage.setItem("radari.cfg",JSON.stringify(CFG));}catch(e){}}
+const limOf=r=>CFG.lim[r.id]||DEF[r.tip];
+const lenOf=s=>CFG.len[s.id]||s.base;
+
+/* ================= ZVUK ================= */
+let sound=true, ac=null;
+function say(t){if(!sound)return;try{
+  const u=new SpeechSynthesisUtterance(t);
+  const v=speechSynthesis.getVoices().find(v=>/sr|hr|bs|sh/i.test(v.lang));
+  if(v)u.voice=v;else u.lang="hr-HR";u.rate=1.05;
+  speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+function beep(n,f){if(!sound)return;try{
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+  if(ac.state==="suspended")ac.resume();
+  for(let i=0;i<n;i++){const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*0.2;
+    o.type="square";o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.3,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.14);
+    o.connect(g).connect(ac.destination);o.start(t);o.stop(t+0.16);}}catch(e){}}
+
+/* ================= STANJE ================= */
+const $=id=>document.getElementById(id);
+let watchId=null,lastFix=null,heading=null,speed=0,wake=null,active=null,lastResult=null;
+
+/* ================= PRAĆENJE ================= */
+function start(){
+  if(!navigator.geolocation){$("status").textContent="Uređaj nema GPS";return;}
+  beep(1,660);say("Praćenje uključeno");
+  watchId=navigator.geolocation.watchPosition(onFix,onErr,{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+  $("startBtn").textContent="Zaustavi praćenje";$("startBtn").classList.remove("primary");
+  $("dot").className="dot live";$("status").textContent="čekam signal…";
+  if("wakeLock" in navigator)navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{});
+}
+function stop(){
+  navigator.geolocation.clearWatch(watchId);watchId=null;active=null;lastFix=null;
+  $("startBtn").textContent="Pokreni praćenje";$("startBtn").classList.add("primary");
+  $("dot").className="dot";$("status").textContent="GPS isključen";
+  $("target").hidden=true;$("idle").hidden=false;$("hud").className="hud";
+  $("secBox").hidden=true;$("kmh").textContent="—";$("speedBox").classList.remove("over");
+  R.forEach(r=>r.st=0);
+  if(wake){wake.release();wake=null;}
+}
+function onErr(e){$("dot").className="dot err";
+  $("status").textContent=e.code===1?"dozvoli pristup lokaciji":"nema GPS signala";}
+
+function onFix(pos){
+  const c=pos.coords,lat=c.latitude,lon=c.longitude;
+  speed=(c.speed!=null&&c.speed>=0)?c.speed:0;
+  let seg=0;
+  if(lastFix){
+    seg=dist(lastFix.lat,lastFix.lon,lat,lon);
+    const dt=(pos.timestamp-lastFix.t)/1000;
+    if(!speed&&dt>0)speed=seg/dt;
+    if(seg>4)heading=bearing(lastFix.lat,lastFix.lon,lat,lon);
+  }
+  if(c.heading!=null&&!isNaN(c.heading)&&speed>1.5)heading=c.heading;
+  lastFix={lat,lon,t:pos.timestamp};
+
+  const kmh=speed*3.6;
+  $("kmh").textContent=kmh<2?"0":Math.round(kmh);
+  $("acc").innerHTML="tačnost ±"+Math.round(c.accuracy)+" m<br>smjer "+(heading==null?"—":Math.round(heading)+"°");
+  $("dot").className="dot live";$("status").textContent="prati";
+  if(mapOn){if(follow){mlat=lat;mlon=lon;}queueDraw();}
+
+  section(lat,lon,seg,pos.timestamp,kmh);
+
+  const lead=Math.min(1200,Math.max(350,speed*20));
+  const near=[];
+  for(const r of R){
+    const d=dist(lat,lon,r.lat,r.lon);
+    if(d>6000){r.st=0;continue;}
+    const b=bearing(lat,lon,r.lat,r.lon), off=heading==null?0:dAng(heading,b);
+    r.d=d;r.b=b;r.off=off;r.ahead=heading==null||off<55||d<200;
+    near.push(r);
+    if(r.ahead&&d<=lead&&r.st===0){
+      r.st=1;beep(2,880);
+      const L=limOf(r);
+      let t=TIP[r.tip].g+" za "+Math.round(d/100)*100+" metara, ograničenje "+L;
+      if(kmh>L+5)t+=". Usporite.";
+      say(t);
+    }
+    if(r.ahead&&d<=180&&r.st===1){r.st=2;beep(3,1320);}
+    if(d>lead*1.6||(heading!=null&&off>110&&d>250))r.st=0;
+  }
+  near.sort((a,b)=>a.d-b.d);
+  render(near,kmh);
+}
+
+/* ---- sekcijsko mjerenje A→B (i B→A) ---- */
+function section(lat,lon,seg,t,kmh){
+  if(active){
+    active.trav+=seg;
+    const L=lenOf(active.sec), lim=Math.min(limOf(active.sec.a),limOf(active.sec.b));
+    const dEnd=dist(lat,lon,active.end.lat,active.end.lon);
+    const el=(t-active.t0)/1000;
+    const done=Math.max(0,Math.min(L,L-dEnd));
+    const avg=el>3?(Math.max(active.trav,done)/el)*3.6:0;
+    const left=Math.max(0,L-Math.max(active.trav,done));
+    const tAll=L/(lim/3.6)-el;
+    const req=tAll>2?Math.min(999,(left/tAll)*3.6):0;
+
+    $("secBox").hidden=false;
+    $("secTitle").textContent="Sekcijsko mjerenje · "+active.sec.a.naziv+" · ograničenje "+lim+" km/h";
+    $("secAvg").textContent=Math.round(avg);
+    $("secReq").textContent=req>0?Math.round(req):"prekoračeno";
+    $("secLeft").textContent=(left/1000).toFixed(1);
+    $("secBar").style.width=Math.round(100*(1-left/L))+"%";
+    $("secBox").className="sec"+(avg>lim?" bad":"");
+
+    if(avg>lim&&!active.warned&&el>20){active.warned=true;beep(3,1320);say("Prosječna brzina iznad ograničenja. Usporite.");}
+    if(avg<=lim&&active.warned&&el>20){active.warned=false;}
+
+    if(dEnd<120||active.trav>L*1.8){
+      const fin=Math.round(avg);
+      beep(2,fin>lim?1320:660);
+      say("Kraj dionice. Prosječna brzina "+fin+" na sat"+(fin>lim?", iznad ograničenja":""));
+      $("secTitle").textContent="Dionica završena · prosjek "+fin+" km/h (ograničenje "+lim+")";
+      lastResult=t;active=null;
+      setTimeout(()=>{if(!active)$("secBox").hidden=true;},25000);
+    }
+    return;
+  }
+  for(const s of SEC){
+    for(const [p,q] of [[s.a,s.b],[s.b,s.a]]){
+      const dp=dist(lat,lon,p.lat,p.lon);
+      if(dp<150){
+        const bq=bearing(lat,lon,q.lat,q.lon);
+        if(heading==null||dAng(heading,bq)<70){
+          active={sec:s,end:q,t0:t,trav:dp<60?0:0,warned:false};
+          beep(2,660);say("Ulaz u sekcijsko mjerenje, ograničenje "+Math.min(limOf(s.a),limOf(s.b)));
+          return;
+        }
+      }
+    }
+  }
+}
+
+/* ================= PRIKAZ ================= */
+function render(near,kmh){
+  const ahead=near.filter(r=>r.ahead), t=ahead[0];
+  if(t){
+    const L=limOf(t);
+    $("idle").hidden=true;$("target").hidden=false;
+    $("kind").textContent=TIP[t.tip].k+" · "+t.grad;
+    $("name").textContent=t.naziv;
+    $("dist").innerHTML=t.d<950?Math.round(t.d/10)*10+"<small>m</small>":(t.d/1000).toFixed(1)+"<small>km</small>";
+    $("eta").textContent=speed>2?"za "+Math.round(t.d/speed)+" s":"";
+    $("sign").hidden=false;$("sign").textContent=L;
+    $("hud").className="hud"+(t.d<200||kmh>L+5&&t.st>=1?" hot":(t.st>=1?" near":""));
+    $("speedBox").classList.toggle("over",kmh>L+5&&t.d<1500);
+    if(heading!=null)$("needle").setAttribute("transform","rotate("+(((t.b-heading)+360)%360)+" 50 50)");
+    else $("needle").removeAttribute("transform");
+  }else{
+    $("idle").hidden=false;$("idle").textContent="Nema radara ispred vozila u radijusu od 6 km.";
+    $("target").hidden=true;$("hud").className="hud";$("speedBox").classList.remove("over");
+  }
+  $("list").innerHTML=near.slice(0,8).map(r=>
+    '<li class="'+(r.ahead?"ahead":"")+'"><span class="m">'+(r.d<950?Math.round(r.d)+" m":(r.d/1000).toFixed(1)+" km")+
+    '</span><span class="t"><b>'+r.naziv+'</b>'+TIP[r.tip].k+' · '+limOf(r)+' km/h</span>'+
+    '<span class="b">'+(r.ahead?"ispred":"iza")+'</span></li>').join("")
+    ||'<li><span class="t">Nema radara u blizini.</span></li>';
+}
+
+/* ============ MAPA (vlastita, bez vanjskih biblioteka) ============ */
+/* Pločice se skidaju sa OpenStreetMap-a kad ima interneta; bez njega
+   ostaje tamna podloga sa radarima, dionicama i tvojom pozicijom. */
+const cv=$("map"), ctx=cv.getContext("2d"), TS=256;
+let mz=8, mlat=42.6, mlon=19.2, mapOn=false, follow=true, sel=null, raf=0;
+const tiles=new Map();
+
+const wx=(lon,z)=>(lon+180)/360*TS*Math.pow(2,z);
+const wy=(lat,z)=>{const s=Math.sin(lat*RAD);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*TS*Math.pow(2,z);};
+const ilon=(x,z)=>x/(TS*Math.pow(2,z))*360-180;
+const ilat=(y,z)=>Math.atan(Math.sinh(Math.PI-2*Math.PI*y/(TS*Math.pow(2,z))))/RAD;
+
+function initMap(){
+  if(mapOn)return; mapOn=true;
+  sizeMap();
+  if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;mz=14;}
+  addEventListener("resize",()=>{sizeMap();drawMap();});
+  bindMapGestures();
+  drawMap();
+}
+function sizeMap(){
+  const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cv.width=Math.max(1,Math.round(r.width*dpr));
+  cv.height=Math.max(1,Math.round(r.height*dpr));
+}
+function tile(z,x,y){
+  const n=1<<z; if(y<0||y>=n)return null;
+  x=((x%n)+n)%n;
+  const k=z+"/"+x+"/"+y;
+  let im=tiles.get(k);
+  if(im===undefined){
+    im=new Image(); im.crossOrigin="anonymous";
+    im.onload=()=>{im.ok=true;queueDraw();};
+    im.onerror=()=>{im.ok=false;};
+    im.src="https://tile.openstreetmap.org/"+k+".png";
+    tiles.set(k,im);
+    if(tiles.size>500){const it=tiles.keys();for(let i=0;i<100;i++)tiles.delete(it.next().value);}
+  }
+  return im&&im.ok?im:null;
+}
+function queueDraw(){ if(!raf) raf=requestAnimationFrame(()=>{raf=0;drawMap();}); }
+
+function drawMap(){
+  if(!mapOn)return;
+  const dpr=window.devicePixelRatio||1, W=cv.width, H=cv.height, T=TS*dpr;
+  const ox=wx(mlon,mz)*dpr-W/2, oy=wy(mlat,mz)*dpr-H/2;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="#0a1017"; ctx.fillRect(0,0,W,H);
+
+  for(let x=Math.floor(ox/T);x<=Math.floor((ox+W)/T);x++)
+    for(let y=Math.floor(oy/T);y<=Math.floor((oy+H)/T);y++){
+      const im=tile(mz,x,y);
+      if(im) ctx.drawImage(im,Math.round(x*T-ox),Math.round(y*T-oy),Math.ceil(T),Math.ceil(T));
+    }
+
+  const P=(la,lo)=>[wx(lo,mz)*dpr-ox, wy(la,mz)*dpr-oy];
+
+  ctx.lineWidth=3*dpr; ctx.strokeStyle="#39c07a"; ctx.setLineDash([7*dpr,7*dpr]);
+  SEC.forEach(s=>{const a=P(s.a.lat,s.a.lon),b=P(s.b.lat,s.b.lon);
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();});
+  ctx.setLineDash([]);
+
+  R.forEach(r=>{
+    const p=P(r.lat,r.lon);
+    if(p[0]<-20||p[1]<-20||p[0]>W+20||p[1]>H+20)return;
+    const rad=(sel&&sel.id===r.id?10:7)*dpr;
+    ctx.beginPath();ctx.arc(p[0],p[1],rad,0,7);
+    ctx.fillStyle=TIP[r.tip].c;ctx.fill();
+    ctx.lineWidth=2*dpr;ctx.strokeStyle=sel&&sel.id===r.id?"#fff":"#0d141d";ctx.stroke();
+  });
+
+  if(lastFix){
+    const p=P(lastFix.lat,lastFix.lon);
+    if(heading!=null){
+      ctx.save();ctx.translate(p[0],p[1]);ctx.rotate(heading*RAD);
+      ctx.beginPath();ctx.moveTo(0,-16*dpr);ctx.lineTo(9*dpr,10*dpr);ctx.lineTo(0,5*dpr);ctx.lineTo(-9*dpr,10*dpr);
+      ctx.closePath();ctx.fillStyle="#4a90d9";ctx.fill();
+      ctx.lineWidth=2*dpr;ctx.strokeStyle="#fff";ctx.stroke();ctx.restore();
+    }else{
+      ctx.beginPath();ctx.arc(p[0],p[1],8*dpr,0,7);
+      ctx.fillStyle="#4a90d9";ctx.fill();ctx.lineWidth=3*dpr;ctx.strokeStyle="#fff";ctx.stroke();
+    }
+  }
+
+  ctx.font=(11*dpr)+"px system-ui";ctx.fillStyle="rgba(232,238,246,.55)";ctx.textAlign="right";
+  ctx.fillText("© OpenStreetMap · zum "+mz, W-8*dpr, H-8*dpr);
+  ctx.textAlign="left";
+}
+
+function zoomTo(z){ mz=Math.max(3,Math.min(18,z)); drawMap(); }
+
+function bindMapGestures(){
+  let pts=new Map(), moved=0, base=0, last=null;
+  cv.addEventListener("pointerdown",e=>{
+    cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===1){last={x:e.clientX,y:e.clientY};moved=0;}
+    if(pts.size===2){const a=[...pts.values()];base=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);}
+  });
+  cv.addEventListener("pointermove",e=>{
+    if(!pts.has(e.pointerId))return;
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){
+      const a=[...pts.values()], d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      if(base&&d/base>1.55){zoomTo(mz+1);base=d;}
+      if(base&&d/base<0.65){zoomTo(mz-1);base=d;}
+      moved=99;return;
+    }
+    if(!last)return;
+    const dx=e.clientX-last.x, dy=e.clientY-last.y;
+    last={x:e.clientX,y:e.clientY}; moved+=Math.abs(dx)+Math.abs(dy);
+    if(moved>6)follow=false;
+    const sc=TS*Math.pow(2,mz);
+    mlon=ilon(wx(mlon,mz)-dx,mz);
+    mlat=ilat(Math.max(0,Math.min(sc,wy(mlat,mz)-dy)),mz);
+    queueDraw();
+  });
+  const up=e=>{
+    if(pts.size===1&&moved<8&&last) pick(e.clientX,e.clientY);
+    pts.delete(e.pointerId); if(pts.size<2)base=0; if(!pts.size)last=null;
+  };
+  cv.addEventListener("pointerup",up);
+  cv.addEventListener("pointercancel",e=>{pts.delete(e.pointerId);base=0;});
+  cv.addEventListener("wheel",e=>{e.preventDefault();follow=false;zoomTo(mz+(e.deltaY<0?1:-1));},{passive:false});
+  cv.addEventListener("dblclick",e=>{e.preventDefault();zoomTo(mz+1);});
+}
+
+function pick(cx,cy){
+  const r0=cv.getBoundingClientRect(), px=cx-r0.left, py=cy-r0.top;
+  const ox=wx(mlon,mz)-r0.width/2, oy=wy(mlat,mz)-r0.height/2;
+  let best=null,bd=1e9;
+  R.forEach(r=>{
+    const d=Math.hypot(wx(r.lon,mz)-ox-px, wy(r.lat,mz)-oy-py);
+    if(d<bd){bd=d;best=r;}
+  });
+  if(bd<22){sel=best;info(best);}else{sel=null;$("mapinfo").hidden=true;}
+  drawMap();
+}
+
+function info(r){
+  const s=(r.tip===3||r.tip===4)?secOf(r.id):null, box=$("mapinfo");
+  box.hidden=false;
+  box.innerHTML='<span class="x" id="mx">×</span><b>'+r.naziv+'</b><small>'+TIP[r.tip].k+' · '+r.grad+'</small>'+
+    '<div class="lim"><input type="number" id="mLim" min="10" max="140" step="5" value="'+limOf(r)+'"><span>km/h ograničenje</span></div>'+
+    (s?'<div class="lim"><input type="number" id="mLen" min="100" step="50" value="'+lenOf(s)+'"><span>m dužina dionice</span></div>':'');
+  $("mx").onclick=()=>{box.hidden=true;sel=null;drawMap();};
+  $("mLim").onchange=e=>{CFG.lim[r.id]=+e.target.value||DEF[r.tip];save();refreshLim();};
+  if(s)$("mLen").onchange=e=>{CFG.len[s.id]=+e.target.value||s.base;save();refreshLim();};
+}
+
+$("zin").onclick=()=>zoomTo(mz+1);
+$("zout").onclick=()=>zoomTo(mz-1);
+$("mefollow").onclick=()=>{follow=true;if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;if(mz<13)mz=15;}drawMap();};
+
+/* ================= OGRANIČENJA ================= */
+function refreshLim(){
+  const q=($("q").value||"").toLowerCase();
+  $("limList").innerHTML=R.filter(r=>!q||(r.naziv+" "+r.grad).toLowerCase().includes(q)).map(r=>{
+    const s=(r.tip===3)?secOf(r.id):null;
+    return '<li><span class="t"><b>'+r.naziv+'</b>'+TIP[r.tip].k+' · '+r.grad+
+      (s?' · dionica '+(lenOf(s)/1000).toFixed(1)+' km':'')+'</span>'+
+      '<input type="number" data-r="'+r.id+'" min="10" max="140" step="5" value="'+limOf(r)+'">'+
+      (s?'<input type="number" data-s="'+s.id+'" min="100" step="50" value="'+lenOf(s)+'">':'')+
+      '<button class="go" data-go="'+r.id+'">Mapa</button></li>';
+  }).join("");
+}
+$("limList").addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.r){const id=+t.dataset.r,r=R.find(x=>x.id===id);CFG.lim[id]=+t.value||DEF[r.tip];}
+  if(t.dataset.s){const s=SEC.find(x=>x.id===+t.dataset.s);CFG.len[s.id]=+t.value||s.base;}
+  save();refreshLim();
+});
+$("limList").addEventListener("click",e=>{
+  const b=e.target.closest("button.go"); if(!b)return;
+  showOnMap(R.find(x=>x.id===+b.dataset.go));
+});
+$("q").addEventListener("input",refreshLim);
+refreshLim();
+
+/* ================= KONTROLE ================= */
+$("startBtn").onclick=()=>watchId?stop():start();
+$("soundBtn").onclick=e=>{sound=!sound;e.currentTarget.setAttribute("aria-pressed",sound);
+  e.currentTarget.textContent=sound?"🔊":"🔇";if(sound)beep(1,880);};
+$("testBtn").onclick=()=>{beep(2,880);say("radar za četiristo metara, ograničenje osamdeset");};
+function goTab(v){
+  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.v===v));
+  document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on",s.id===v));
+  if(v==="mapView"){initMap();setTimeout(()=>{sizeMap();drawMap();},60);}
+}
+function showOnMap(r){
+  if(!r)return;
+  goTab("mapView"); initMap();
+  follow=false; sel=r; mlat=r.lat; mlon=r.lon; if(mz<15)mz=15;
+  info(r);
+  setTimeout(()=>{sizeMap();drawMap();},60);
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.v));
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"&&watchId&&"wakeLock" in navigator)
+    navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{});
+});
+</script>
+</body>
+</html>
