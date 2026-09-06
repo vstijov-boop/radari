@@ -112,6 +112,8 @@
   .search{width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);
     border-radius:10px;padding:12px 14px;font:inherit}
   .hint{font-size:12.5px;color:var(--dim);line-height:1.5;padding:0 2px;margin:0}
+  .offbtns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .offbtns .primary{flex:0 0 auto}
 
   footer{border-top:1px solid var(--line);padding:9px 12px;display:flex;gap:8px;align-items:center}
   button{font:inherit;font-size:14px;font-weight:500;color:var(--ink);background:#1c2a3b;
@@ -198,6 +200,28 @@
   <ul id="limList"></ul>
 </section>
 
+<!-- OFFLINE -->
+<section class="view" id="offView">
+  <div class="hud">
+    <div class="name">Offline mapa</div>
+    <p class="hint">Snima pločice izabrane podloge na telefon: cijela Crna Gora na krupnijem planu,
+      plus detaljno oko svakog radara. Poslije toga mapa radi bez interneta i ne troši mobilni saobraćaj.
+      Preuzimanje traje nekoliko minuta — ostavi ekran uključen i budi na Wi-Fi mreži.</p>
+    <div class="grid" style="margin-top:14px">
+      <div><b id="offCount">—</b><span>sačuvanih pločica</span></div>
+      <div><b id="offSize">—</b><span>zauzeto</span></div>
+      <div><b id="offLayer">—</b><span>podloga</span></div>
+    </div>
+    <div class="bar" id="offBarWrap" hidden><i id="offBar" style="width:0%"></i></div>
+    <div class="offbtns">
+      <button class="primary" id="offGo">Preuzmi mapu</button>
+      <button id="offStop" hidden>Prekini</button>
+      <button id="offClear">Obriši keš</button>
+    </div>
+    <p class="hint" id="offMsg" style="margin-top:12px"></p>
+  </div>
+</section>
+
 <footer>
   <button class="primary" id="startBtn">Pokreni praćenje</button>
   <button class="toggle" id="soundBtn" aria-pressed="true">🔊</button>
@@ -208,6 +232,7 @@
   <button aria-selected="true" data-v="driveView">Vožnja</button>
   <button aria-selected="false" data-v="mapView">Mapa</button>
   <button aria-selected="false" data-v="limView">Ograničenja</button>
+  <button aria-selected="false" data-v="offView">Offline</button>
 </nav>
 
 <script>
@@ -397,7 +422,13 @@ function onFix(pos){
   $("kmh").textContent=kmh<2?"0":Math.round(kmh);
   $("acc").innerHTML="tačnost ±"+Math.round(c.accuracy)+" m<br>smjer "+(heading==null?"—":Math.round(heading)+"°");
   $("dot").className="dot live";$("status").textContent="prati";
-  if(mapOn){if(follow){mlat=lat;mlon=lon;}queueDraw();}
+  if(mapOn){
+    if(follow){
+      mlat=lat; mlon=lon;
+      if(autoZoom){const z=Math.min(zoomForSpeed(kmh),LAYERS[layIdx].max); if(z!==mz)mz=z;}
+    }
+    queueDraw();
+  }
 
   section(lat,lon,seg,pos.timestamp,kmh);
 
@@ -522,6 +553,7 @@ const LAYERS=[
    url:(z,x,y)=>"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/"+z+"/"+y+"/"+x}
 ];
 let layIdx=Math.max(0,LAYERS.findIndex(l=>l.id===CFG.layer));
+let autoZoom=true;
 
 const wx=(lon,z)=>(lon+180)/360*TS*Math.pow(2,z);
 const wy=(lat,z)=>{const s=Math.sin(lat*RAD);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*TS*Math.pow(2,z);};
@@ -607,6 +639,9 @@ function drawMap(){
 }
 
 function zoomTo(z){ mz=Math.max(3,Math.min(LAYERS[layIdx].max,z)); drawMap(); }
+function manualZoom(z){ autoZoom=false; zoomTo(z); }
+/* Brze vozis - vidis dalje ispred sebe. */
+const zoomForSpeed=kmh => kmh<30?16 : kmh<60?15 : kmh<90?14 : 13;
 
 /* ---- izbor podloge ---- */
 function buildLayers(){
@@ -649,8 +684,8 @@ function bindMapGestures(){
     pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size===2){
       const a=[...pts.values()], d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
-      if(base&&d/base>1.55){zoomTo(mz+1);base=d;}
-      if(base&&d/base<0.65){zoomTo(mz-1);base=d;}
+      if(base&&d/base>1.55){manualZoom(mz+1);base=d;}
+      if(base&&d/base<0.65){manualZoom(mz-1);base=d;}
       moved=99;return;
     }
     if(!last)return;
@@ -668,8 +703,8 @@ function bindMapGestures(){
   };
   cv.addEventListener("pointerup",up);
   cv.addEventListener("pointercancel",e=>{pts.delete(e.pointerId);base=0;});
-  cv.addEventListener("wheel",e=>{e.preventDefault();setFollow(false);zoomTo(mz+(e.deltaY<0?1:-1));},{passive:false});
-  cv.addEventListener("dblclick",e=>{e.preventDefault();zoomTo(mz+1);});
+  cv.addEventListener("wheel",e=>{e.preventDefault();setFollow(false);manualZoom(mz+(e.deltaY<0?1:-1));},{passive:false});
+  cv.addEventListener("dblclick",e=>{e.preventDefault();manualZoom(mz+1);});
 }
 
 function pick(cx,cy){
@@ -696,9 +731,108 @@ function info(r){
   if(s)$("mLen").onchange=e=>{CFG.len[s.id]=+e.target.value||s.base;save();refreshLim();};
 }
 
-$("zin").onclick=()=>zoomTo(mz+1);
-$("zout").onclick=()=>zoomTo(mz-1);
-$("mefollow").onclick=()=>{if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;if(mz<13)mz=15;}setFollow(true);drawMap();};
+$("zin").onclick=()=>manualZoom(mz+1);
+$("zout").onclick=()=>manualZoom(mz-1);
+$("mefollow").onclick=()=>{autoZoom=true;if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;if(mz<13)mz=15;}setFollow(true);drawMap();};
+
+/* ============ OFFLINE MAPA ============ */
+/* Plan: cijela zemlja krupno (z8-12) + detaljno oko svakog radara (z13-15).
+   Detaljni zumovi se rade samo oko radara jer bi cijela Crna Gora na z15
+   bila desetine hiljada pločica, a ionako je bitno samo ono uz put. */
+const TILE_CACHE="radari-tiles-v1";
+const MNE={n:43.58,s:41.82,w:18.40,e:20.40};
+let offAbort=false, offBusy=false;
+
+function boxTiles(z,b){
+  const n=1<<z, out=[];
+  const x0=Math.max(0,Math.floor(wx(b.w,z)/TS)), x1=Math.min(n-1,Math.floor(wx(b.e,z)/TS));
+  const y0=Math.max(0,Math.floor(wy(b.n,z)/TS)), y1=Math.min(n-1,Math.floor(wy(b.s,z)/TS));
+  for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++) out.push([z,x,y]);
+  return out;
+}
+function radarTiles(z,km){
+  const n=1<<z, seen=new Set(), out=[];
+  R.forEach(r=>{
+    const dLat=km/111, dLon=km/(111*Math.cos(r.lat*RAD));
+    const x0=Math.floor(wx(r.lon-dLon,z)/TS), x1=Math.floor(wx(r.lon+dLon,z)/TS);
+    const y0=Math.floor(wy(r.lat+dLat,z)/TS), y1=Math.floor(wy(r.lat-dLat,z)/TS);
+    for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++){
+      if(x<0||y<0||x>=n||y>=n)continue;
+      const k=z+"/"+x+"/"+y;
+      if(seen.has(k))continue;
+      seen.add(k); out.push([z,x,y]);
+    }
+  });
+  return out;
+}
+function offPlan(){
+  const list=[];
+  for(let z=8;z<=12;z++) list.push(...boxTiles(z,MNE));
+  for(let z=13;z<=15;z++) list.push(...radarTiles(z,1.5));
+  return list;
+}
+
+async function offStats(){
+  let n="—";
+  if("caches" in window){
+    try{ n=(await (await caches.open(TILE_CACHE)).keys()).length; }catch(e){}
+  }
+  let sz="—";
+  if(navigator.storage&&navigator.storage.estimate){
+    try{ const e=await navigator.storage.estimate();
+      if(e.usage!=null) sz=(e.usage/1048576).toFixed(0)+" MB";
+    }catch(e){}
+  }
+  $("offCount").textContent=n;
+  $("offSize").textContent=sz;
+  $("offLayer").textContent=LAYERS[layIdx].name;
+  if(!offBusy) $("offMsg").textContent="Plan preuzimanja: "+offPlan().length.toLocaleString("sr")+" pločica za podlogu „"+LAYERS[layIdx].name+"”.";
+}
+
+async function offDownload(){
+  if(!("caches" in window)){$("offMsg").textContent="Ovaj browser ne podržava offline keš.";return;}
+  if(!navigator.serviceWorker||!navigator.serviceWorker.controller){
+    $("offMsg").textContent="Offline sloj se još priprema. Osvježi stranicu pa probaj ponovo.";return;}
+
+  const list=offPlan(), L=LAYERS[layIdx];
+  offAbort=false; offBusy=true;
+  $("offGo").hidden=true; $("offStop").hidden=false; $("offBarWrap").hidden=false;
+
+  let done=0, fail=0, i=0;
+  const paint=()=>{
+    $("offBar").style.width=(done/list.length*100).toFixed(1)+"%";
+    $("offMsg").textContent=done.toLocaleString("sr")+" / "+list.length.toLocaleString("sr")+
+      " pločica"+(fail?" · "+fail+" neuspjelih":"");
+  };
+  /* Namjerno samo 4 paralelna zahtjeva — pločice su tuđi besplatni serveri. */
+  const worker=async()=>{
+    while(i<list.length&&!offAbort){
+      const t=list[i++];
+      try{ const r=await fetch(L.url(t[0],t[1],t[2]),{mode:"cors"}); if(!r.ok)fail++; }
+      catch(e){ fail++; }
+      done++;
+      if(done%20===0||done===list.length) paint();
+    }
+  };
+  await Promise.all([worker(),worker(),worker(),worker()]);
+
+  offBusy=false;
+  $("offGo").hidden=false; $("offStop").hidden=true;
+  await offStats();
+  $("offMsg").textContent = offAbort
+    ? "Prekinuto na "+done.toLocaleString("sr")+" pločica. Ono što je skinuto ostaje sačuvano."
+    : "Gotovo: "+done.toLocaleString("sr")+" pločica"+(fail?", "+fail+" nije uspjelo":"")+".";
+}
+
+$("offGo").onclick=offDownload;
+$("offStop").onclick=()=>{offAbort=true;$("offStop").hidden=true;};
+$("offClear").onclick=async()=>{
+  if(!("caches" in window))return;
+  await caches.delete(TILE_CACHE);
+  $("offBarWrap").hidden=true; $("offBar").style.width="0%";
+  await offStats();
+  $("offMsg").textContent="Keš pločica obrisan.";
+};
 
 /* ================= OGRANIČENJA ================= */
 function refreshLim(){
@@ -734,6 +868,7 @@ function goTab(v){
   document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.v===v));
   document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on",s.id===v));
   if(v==="mapView"){initMap();setTimeout(()=>{sizeMap();drawMap();},60);}
+  if(v==="offView")offStats();
 }
 function showOnMap(r){
   if(!r)return;
@@ -743,6 +878,10 @@ function showOnMap(r){
   setTimeout(()=>{sizeMap();drawMap();},60);
 }
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.v));
+if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
+  addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"&&watchId&&"wakeLock" in navigator)
     navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{});

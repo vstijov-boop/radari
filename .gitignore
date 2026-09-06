@@ -1,2 +1,3 @@
 # lokalni materijali, ne idu na GitHub
 *.pdf
+.claude/
