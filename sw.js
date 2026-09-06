@@ -1,22 +1,26 @@
 /* Service worker: aplikacija radi bez interneta, pločice mape se čuvaju na telefonu. */
-const SHELL = "radari-shell-v1";
+const SHELL = "radari-shell-v2";
 const TILES = "radari-tiles-v1";
 
 const SHELL_FILES = [
   "./", "./index.html", "./manifest.json",
-  "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"
+  "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
+  "./slike/rk-1.jpg", "./slike/rk-2.jpg", "./slike/rk-3.jpg",
+  "./slike/rk-11.jpg", "./slike/rk-18.jpg"
 ];
 
 /* Hostovi sa kojih dolaze pločice podloge. */
 const TILE_HOST = /(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$|(^|\.)cartocdn\.com$/;
 
 self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open(SHELL)
-      .then(c => c.addAll(SHELL_FILES))
-      .then(() => self.skipWaiting())
-      .catch(() => self.skipWaiting())
-  );
+  /* Svaki fajl posebno: da jedan koji fali ne obori cijelo kesiranje. */
+  e.waitUntil((async () => {
+    try {
+      const c = await caches.open(SHELL);
+      await Promise.allSettled(SHELL_FILES.map(f => c.add(f)));
+    } catch (err) {}
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", e => {

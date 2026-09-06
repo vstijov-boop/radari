@@ -42,7 +42,8 @@
   .mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
   .mapctl button{width:44px;height:44px;padding:0;font-size:19px;background:rgba(20,30,43,.92)}
   .mapinfo{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(20,30,43,.96);
-    border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+    border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+    max-height:78%;overflow:auto;-webkit-overflow-scrolling:touch}
   .mapinfo b{display:block;font-size:14px;margin-bottom:2px}
   .mapinfo small{color:var(--dim);font-size:12.5px}
   .mapinfo .lim{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
@@ -56,6 +57,8 @@
   .mapinfo .raskr b{font-size:13px;margin-bottom:3px}
   .mapinfo .raskr span{display:block;font-size:12px;color:var(--dim);line-height:1.45}
   .mapinfo .raskr .st{margin-top:5px;color:var(--blue)}
+  .mapinfo .rkslika{margin-top:10px;width:100%;padding:9px;font-size:12.5px}
+  .mapinfo .rkslika-im{display:block;width:100%;margin-top:10px;border-radius:8px;border:1px solid var(--line)}
   .mapinfo .x{position:absolute;right:10px;top:8px;color:var(--dim);font-size:20px;padding:4px 8px;cursor:pointer}
 
   /* --- navigacijski sloj mape --- */
@@ -1038,7 +1041,14 @@ function info(r){
       (rk.par
         ? '<b>'+(rk.par*2)+' uređaja u '+rk.par+' para</b><span>po jedan par na svakom prilazu — '+rk.ure+'</span>'
         : '<b>Oprema još nije projektovana</b><span>lokacija je predviđena, ali raspored uređaja u dokumentu ne postoji</span>')+
-      '<span class="st">status u projektu: '+rk.st+'</span></div>');
+      '<span class="st">status u projektu: '+rk.st+'</span>'+
+      '<button class="rkslika" id="rkImg">'+(rk.par?'Prikaži raspored uređaja':'Prikaži snimak lokacije')+'</button>'+
+      '</div>');
+    /* Slika se ucitava tek na dodir - u voznji nema potrebe da se skida. */
+    $("rkImg").onclick=e=>{
+      e.currentTarget.outerHTML='<img class="rkslika-im" src="slike/rk-'+r.id+'.jpg" alt="ortofoto lokacije '+r.id+'">';
+      layoutRecenter();
+    };
   }
   if(r.moj){
     box.insertAdjacentHTML("beforeend",
