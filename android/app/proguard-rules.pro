@@ -1,0 +1,5 @@
+-keep class androidx.car.app.** { *; }
+-keep class com.mapbox.maps.** { *; }
+-keep class com.mapbox.extension.androidauto.** { *; }
+-keep class cg.radari.app.model.** { *; }
+-dontwarn com.mapbox.**

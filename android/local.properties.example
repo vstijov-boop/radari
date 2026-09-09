@@ -1,0 +1,10 @@
+# Mapbox javni (pk.*) token za renderovanje karata u aplikaciji.
+# https://account.mapbox.com/access-tokens/
+MAPBOX_PUBLIC_TOKEN=paste_your_public_token_here
+
+# Mapbox DOWNLOADS:READ token za povlacenje SDK-a sa Mapbox maven repozitorija.
+MAPBOX_DOWNLOADS_TOKEN=paste_your_downloads_token_here
+
+# Supabase (patrole ekipe) - opciono. Bez ovoga app radi samo sa zvanicnom bazom.
+SUPABASE_URL=
+SUPABASE_ANON_KEY=

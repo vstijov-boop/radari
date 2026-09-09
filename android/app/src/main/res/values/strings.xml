@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Radari CG</string>
+    <string name="tracking_start">Pokreni praćenje</string>
+    <string name="tracking_stop">Zaustavi praćenje</string>
+    <string name="tracking_on">Praćenje uključeno</string>
+    <string name="tracking_off">Praćenje isključeno</string>
+    <string name="no_threat">Nema radara ispred</string>
+    <string name="no_gps">Nema GPS signala</string>
+    <string name="nearest_list">Najbliži</string>
+    <string name="settings">Podešavanja</string>
+    <string name="sound_on">Zvuk uključen</string>
+    <string name="sound_off">Zvuk isključen</string>
+    <string name="test_alert">Proba zvuka</string>
+    <string name="patrol_here">Patrola ovdje</string>
+    <string name="patrol_sent">Patrola poslana</string>
+    <string name="patrol_queue">Sačuvano, poslaće se kad dođe internet</string>
+    <string name="patrol_off">Patrole ekipe nisu podešene</string>
+    <string name="cue_close">Blizu!</string>
+    <string name="error_prefix">Greška:</string>
+    <string name="threat_radar">radar</string>
+    <string name="threat_intersection">kamera na raskrsnici</string>
+    <string name="threat_section_start">početak sekcijskog mjerenja</string>
+    <string name="threat_section_end">kraj sekcijskog mjerenja</string>
+    <string name="threat_patrol">patrola</string>
+    <string name="slow_down">Usporite</string>
+    <string name="car_home_title">Radari CG</string>
+    <string name="car_permission_needed">Dozvolite lokaciju, pa ponovo pokrenite praćenje</string>
+</resources>

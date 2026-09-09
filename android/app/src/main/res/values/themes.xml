@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema telefonske aktivnosti -->
+    <style name="Theme.Radari" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0d141d</item>
+        <item name="android:windowBackground">#0d141d</item>
+    </style>
+</resources>
