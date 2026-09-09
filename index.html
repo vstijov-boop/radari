@@ -180,6 +180,8 @@
     </div>
   </div>
 
+  <p class="hint" id="audioNote">Zvuk se uključuje na prvi dodir — pritisni „Proba“ ili „Pokreni praćenje“.</p>
+
   <div class="sec" id="secBox" hidden>
     <h3 id="secTitle">Sekcijsko mjerenje u toku</h3>
     <div class="grid">
@@ -530,21 +532,91 @@ function mojObrisi(id){
 }
 mojeUR();
 
-/* ================= ZVUK ================= */
-let sound=true, ac=null;
+/* ================= ZVUK =================
+   Chrome na Androidu uspava WebAudio i govor cim se ekran ugasi ili aplikacija
+   ode u pozadinu — zbog toga upozorenja u autu nisu radila. Rjesenje je da
+   stranica cijelo vrijeme pusta jedan tihi zvuk u petlji: za sistem je tada
+   "aplikacija koja svira", medijska sesija ostaje otvorena i kroz nju prolaze
+   i piskovi i govor, preko Bluetooth zvucnika auta.
+   Piskovi su unaprijed snimljeni (WAV u data URI) umjesto WebAudio oscilatora,
+   jer HTMLAudioElement radi i onda kad je AudioContext uspavan. */
+let sound=true, audioArmed=false, keepEl=null, sayVoice=null;
+
+/* Skoro tiha petlja koja drzi medijsku sesiju otvorenom. */
+const SIL="data:audio/wav;base64,UklGRqQMAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YYAMAACBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
+/* Kljuc je "brojPiskova_frekvencija" — iste vrijednosti koje zove ostatak koda. */
+const TONES={
+  "1_660":"data:audio/wav;base64,UklGRoQEAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWAEAACAgYKDhIOAfHl2dnl/ho2QkIuCd25panF9ipadnJSFdGVdXWd5jZ+qqp6Kcl1QUFxzjqe2t6qQclZFQlBsjq3BxbWYdFM/O0lmiqvBxbiceFdAOkdihae/xrqgfVtCOkRegaS9xr2kgV5EOkJbfaC6xr+nhWJHOkBXeJy4xcGrimZJOz9TdJi1xcKujmpMPD1QcJOyxMOxkm9PPTxNa4+vwsS0l3NTPjtKZ4uswcW3m3dWQDtHY4eov8a6n3xaQjpFX4Kkvca8o4BdRDpDXH6hu8a+poRhRjpBWHmducXAqollSTs/VHWZtsXCrY1pTDw+UXGVs8TDsZFuTz08Tm2QsMPEtJZyUj47S2iMrcHFt5p2VT87SGSIqcDGuZ57WUE6RmCDpb7GvKJ/XEM6Q1x/orzGvqWDYEY6QVl7nrnGwKmIZEg7P1V2mrfFwa2MaEs7PlJylrTEw7CQbU48PU9ukbHDxLOVcVE+PExpja3CxbaZdVQ/O0lliarAxbmdeVhBOkZhhKa+xruhflxDOkRdgKO8xr2kgl9FOkJafJ+6xr+oh2NHO0BWd5u3xcGsi2dKOz5Tc5e0xMKvj2tNPD1Pb5Kxw8Syk3BQPTxMao6uwsW1mHRTPztJZoqrwcW4nHhXQDpHYoWnv8a6oH1bQjpEXoGkvca9pIFeRDpCW32gusa/p4ViRzpAV3icuMXBq4pmSTs/U3SYtcXCro5qTDw9UHCTssTDsZJvTz08TWuPr8LEtJdzUz47SmeLrMHFt5t3VkA7R2OHqL/Gup98WkI6RV+CpL3GvKOAXUQ6Q1x+obvGvqaEYUY6QVh5nbnFwKqJZUk7P1R1mbbFwq2NaUw8PlFxlbPEw7GRbk89PE5tkLDDxLSWclI+O0tojK3BxbeadlU/O0hkiKnAxrmee1lBOkZgg6W+xryif1xDOkNcf6K8xr6lg2BGOkFZe565xsCpiGRIOz9Vdpq3xcGtjGhLOz5Scpa0xMOwkG1OPD1PbpGxw8SzlXFRPjxMaY2twsW2mXVUPztJZYmqwMW5nXlYQTpGYYSmvsa7oX5cQzpEXYCjvMa9pIJfRTpCWnyfusa/qIdjRztAVnebt8XBrItnSjs+U3OXtMTCr49rTTw9T2+SscPEspNwUD08TGqOrsLFtZh0Uz87SWaKq8HFuJx4V0A6R2KFp7/GuqB9W0I6RF6BpL3GvaSBXkQ6Qlt9oLrGv6eFYkc6QFd4nLjFwauKZkk7P1N0mLXFwq6Oakw8PVBwk7LEw7GSb089PE1rj6/CxLSXc1M+O0pni6zBxbebd1ZAO0djh6i/xrqffFpCOkVfgqS9xryjgF1EOkNcfqG7xr6mhGFGOkFYeZ25xcCqiWVJOz9UdZm2xcKtjWlMPD5RcZWzxMOxkW5PPTxObZCwwsKxlHNWRURSbIqktLaqk3lhU1BaboWap6mhkX1rYF1kcYGQmpyXjYB0bGpudoCIjo+Nh4F7eHd5fICCg4KB",
+  "2_1320":"data:audio/wav;base64,UklGRsQKAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAKAACAgYKAfHuAhoiBd3V+i46Dc298kJWFbmh5k5uIa2F2lqKMaFpymamRZlNsmrCWZU1nm7ecZUZgm72jZUBamsOqZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2I6V5zFq2Y7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2M+Wpq/pmpFWpS4pW9MXI6xo3RTX4qqoHhaYoajnHxhZoOcmH5oaoGVlIBub3+Pj4F0dH+JiYF6en+Dg4B/gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGCgHx7gIaIgXd1fouOg3NvfJCVhW5oeZObiGthdpaijGhacpmpkWZTbJqwlmVNZ5u3nGVGYJu9o2VAWprDqmY7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2I6V5zFq2Y7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdjPlqav6ZqRVqUuKVvTFyOsaN0U1+KqqB4WmKGo5x8YWaDnJh+aGqBlZSAbm9/j4+BdHR/iYmBenp/g4OAfw==",
+  "2_660":"data:audio/wav;base64,UklGRsQKAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAKAACAgYKDhIOAfHl2dnl/ho2QkIuCd25panF9ipadnJSFdGVdXWd5jZ+qqp6Kcl1QUFxzjqe2t6qQclZFQlBsjq3BxbWYdFM/O0lmiqvBxbiceFdAOkdihae/xrqgfVtCOkRegaS9xr2kgV5EOkJbfaC6xr+nhWJHOkBXeJy4xcGrimZJOz9TdJi1xcKujmpMPD1QcJOyxMOxkm9PPTxNa4+vwsS0l3NTPjtKZ4uswcW3m3dWQDtHY4eov8a6n3xaQjpFX4Kkvca8o4BdRDpDXH6hu8a+poRhRjpBWHmducXAqollSTs/VHWZtsXCrY1pTDw+UXGVs8TDsZFuTz08Tm2QsMPEtJZyUj47S2iMrcHFt5p2VT87SGSIqcDGuZ57WUE6RmCDpb7GvKJ/XEM6Q1x/orzGvqWDYEY6QVl7nrnGwKmIZEg7P1V2mrfFwa2MaEs7PlJylrTEw7CQbU48PU9ukbHDxLOVcVE+PExpja3CxbaZdVQ/O0lliarAxbmdeVhBOkZhhKa+xruhflxDOkRdgKO8xr2kgl9FOkJafJ+6xr+oh2NHO0BWd5u3xcGsi2dKOz5Tc5e0xMKvj2tNPD1Pb5Kxw8Syk3BQPTxMao6uwsW1mHRTPztJZoqrwcW4nHhXQDpHYoWnv8a6oH1bQjpEXoGkvca9pIFeRDpCW32gusa/p4ViRzpAV3icuMXBq4pmSTs/U3SYtcXCro5qTDw9UHCTssTDsZJvTz08TWuPr8LEtJdzUz47SmeLrMHFt5t3VkA7R2OHqL/Gup98WkI6RV+CpL3GvKOAXUQ6Q1x+obvGvqaEYUY6QVh5nbnFwKqJZUk7P1R1mbbFwq2NaUw8PlFxlbPEw7GRbk89PE5tkLDDxLSWclI+O0tojK3BxbeadlU/O0hkiKnAxrmee1lBOkZgg6W+xryif1xDOkNcf6K8xr6lg2BGOkFZe565xsCpiGRIOz9Vdpq3xcGtjGhLOz5Scpa0xMOwkG1OPD1PbpGxw8SzlXFRPjxMaY2twsW2mXVUPztJZYmqwMW5nXlYQTpGYYSmvsa7oX5cQzpEXYCjvMa9pIJfRTpCWnyfusa/qIdjRztAVnebt8XBrItnSjs+U3OXtMTCr49rTTw9T2+SscPEspNwUD08TGqOrsLFtZh0Uz87SWaKq8HFuJx4V0A6R2KFp7/GuqB9W0I6RF6BpL3GvaSBXkQ6Qlt9oLrGv6eFYkc6QFd4nLjFwauKZkk7P1N0mLXFwq6Oakw8PVBwk7LEw7GSb089PE1rj6/CxLSXc1M+O0pni6zBxbebd1ZAO0djh6i/xrqffFpCOkVfgqS9xryjgF1EOkNcfqG7xr6mhGFGOkFYeZ25xcCqiWVJOz9UdZm2xcKtjWlMPD5RcZWzxMOxkW5PPTxObZCwwsKxlHNWRURSbIqktLaqk3lhU1BaboWap6mhkX1rYF1kcYGQmpyXjYB0bGpudoCIjo+Nh4F7eHd5fICCg4KBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGCg4SDgHx5dnZ5f4aNkJCLgnduaWpxfYqWnZyUhXRlXV1neY2fqqqeinJdUFBcc46ntreqkHJWRUJQbI6twcW1mHRTPztJZoqrwcW4nHhXQDpHYoWnv8a6oH1bQjpEXoGkvca9pIFeRDpCW32gusa/p4ViRzpAV3icuMXBq4pmSTs/U3SYtcXCro5qTDw9UHCTssTDsZJvTz08TWuPr8LEtJdzUz47SmeLrMHFt5t3VkA7R2OHqL/Gup98WkI6RV+CpL3GvKOAXUQ6Q1x+obvGvqaEYUY6QVh5nbnFwKqJZUk7P1R1mbbFwq2NaUw8PlFxlbPEw7GRbk89PE5tkLDDxLSWclI+O0tojK3BxbeadlU/O0hkiKnAxrmee1lBOkZgg6W+xryif1xDOkNcf6K8xr6lg2BGOkFZe565xsCpiGRIOz9Vdpq3xcGtjGhLOz5Scpa0xMOwkG1OPD1PbpGxw8SzlXFRPjxMaY2twsW2mXVUPztJZYmqwMW5nXlYQTpGYYSmvsa7oX5cQzpEXYCjvMa9pIJfRTpCWnyfusa/qIdjRztAVnebt8XBrItnSjs+U3OXtMTCr49rTTw9T2+SscPEspNwUD08TGqOrsLFtZh0Uz87SWaKq8HFuJx4V0A6R2KFp7/GuqB9W0I6RF6BpL3GvaSBXkQ6Qlt9oLrGv6eFYkc6QFd4nLjFwauKZkk7P1N0mLXFwq6Oakw8PVBwk7LEw7GSb089PE1rj6/CxLSXc1M+O0pni6zBxbebd1ZAO0djh6i/xrqffFpCOkVfgqS9xryjgF1EOkNcfqG7xr6mhGFGOkFYeZ25xcCqiWVJOz9UdZm2xcKtjWlMPD5RcZWzxMOxkW5PPTxObZCww8S0lnJSPjtLaIytwcW3mnZVPztIZIipwMa5nntZQTpGYIOlvsa8on9cQzpDXH+ivMa+pYNgRjpBWXueucbAqYhkSDs/VXaat8XBrYxoSzs+UnKWtMTDsJBtTjw9T26RscPEs5VxUT48TGmNrcLFtpl1VD87SWWJqsDFuZ15WEE6RmGEpr7Gu6F+XEM6RF2Ao7zGvaSCX0U6Qlp8n7rGv6iHY0c7QFZ3m7fFwayLZ0o7PlNzl7TEwq+Pa008PU9vkrHDxLKTcFA9PExqjq7CxbWYdFM/O0lmiqvBxbiceFdAOkdihae/xrqgfVtCOkRegaS9xr2kgV5EOkJbfaC6xr+nhWJHOkBXeJy4xcGrimZJOz9TdJi1xcKujmpMPD1QcJOyxMOxkm9PPTxNa4+vwsS0l3NTPjtKZ4uswcW3m3dWQDtHY4eov8a6n3xaQjpFX4Kkvca8o4BdRDpDXH6hu8a+poRhRjpBWHmducXAqollSTs/VHWZtsXCrY1pTDw+UXGVs8TDsZFuTz08Tm2QsMLCsZRzVkVEUmyKpLS2qpN5YVNQWm6FmqepoZF9a2BdZHGBkJqcl42AdGxqbnaAiI6PjYeBe3h3eXyAgoOCgQ==",
+  "2_880":"data:audio/wav;base64,UklGRsQKAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAKAACAgYKDgn56eHp/hoyMhnxzb3J+i5WVjHtsZWp6j52fknxmW2F2kaapmn1hUVdxkq2zooBdSE1qk7S+q4RaQENjkbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xbCEVzxBYpG5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8WwhFc8QWKRucaziVs+P16Ntsa2jV4/PluJs8a5kWJBPFeEsMW7lmZDO1OArcW9mmpFO1B8qcS/nm9HOk13pcLBonNKOkpzosHCpXdNOkdvnr/EqXxQO0Vqmr3FrYBTO0NmlrvFsIRXPEFikbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xbCEVzxBYpG5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8WwhFc8QWKRucaziVs+P16Ntsa2jV4/PluJs8a5kWJBPFeEsMW7lmZDO1OArcW9mmpFO1B8qcS/nm9HOk13pcLBonNKOkpzosHCpXdNOkdvnr/EqXxQO0Vqmr3FrYBTO0NmlrvFsIRXPEFikbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xbCEVzxBYpG5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8WwhFc8QWKRucaziVs+P16Ntsa2jV4/PluJs8a5kWJBPFeEsMW7lmZDO1OArcW9mmpFO1B8qcS/nm9HOk13pcLBonNKOkpzosHCpXdNOkdvnr/EqXxQO0Vqmr3FrYBTO0NmlrvFsIRXPEFikbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xK6EWkJHZo+xu6qHYkxOZ4qnsaWJalZWaYWdp5+JcWBfbYKVnZiIdmpocYCNk5CGe3Nyd3+GioiDfnx8foCBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGCg4J+enh6f4aMjIZ8c29yfouVlYx7bGVqeo+dn5J8ZlthdpGmqZp9YVFXcZKts6KAXUhNapO0vquEWkBDY5G5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8WwhFc8QWKRucaziVs+P16Ntsa2jV4/PluJs8a5kWJBPFeEsMW7lmZDO1OArcW9mmpFO1B8qcS/nm9HOk13pcLBonNKOkpzosHCpXdNOkdvnr/EqXxQO0Vqmr3FrYBTO0NmlrvFsIRXPEFikbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xbCEVzxBYpG5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8WwhFc8QWKRucaziVs+P16Ntsa2jV4/PluJs8a5kWJBPFeEsMW7lmZDO1OArcW9mmpFO1B8qcS/nm9HOk13pcLBonNKOkpzosHCpXdNOkdvnr/EqXxQO0Vqmr3FrYBTO0NmlrvFsIRXPEFikbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xbCEVzxBYpG5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8WwhFc8QWKRucaziVs+P16Ntsa2jV4/PluJs8a5kWJBPFeEsMW7lmZDO1OArcW9mmpFO1B8qcS/nm9HOk13pcLBonNKOkpzosHCpXdNOkdvnr/EqXxQO0Vqmr3FrYBTO0NmlrvFsIRXPEFikbnGs4lbPj9ejbbGto1ePz5bibPGuZFiQTxXhLDFu5ZmQztTgK3FvZpqRTtQfKnEv55vRzpNd6XCwaJzSjpKc6LBwqV3TTpHb56/xKl8UDtFapq9xa2AUztDZpa7xbCEVzxBYpG5xrOJWz4/Xo22xraNXj8+W4mzxrmRYkE8V4SwxbuWZkM7U4Ctxb2aakU7UHypxL+eb0c6TXelwsGic0o6SnOiwcKld006R2+ev8SpfFA7RWqavcWtgFM7Q2aWu8SuhFpCR2aPsbuqh2JMTmeKp7GliWpWVmmFnaefiXFgX22ClZ2YiHZqaHGAjZOQhntzcnd/hoqIg358fH6AgQ==",
+  "3_1320":"data:audio/wav;base64,UklGRgQRAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YeAQAACAgYKAfHuAhoiBd3V+i46Dc298kJWFbmh5k5uIa2F2lqKMaFpymamRZlNsmrCWZU1nm7ecZUZgm72jZUBamsOqZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2I6V5zFq2Y7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2M+Wpq/pmpFWpS4pW9MXI6xo3RTX4qqoHhaYoajnHxhZoOcmH5oaoGVlIBub3+Pj4F0dH+JiYF6en+Dg4B/gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGCgHx7gIaIgXd1fouOg3NvfJCVhW5oeZObiGthdpaijGhacpmpkWZTbJqwlmVNZ5u3nGVGYJu9o2VAWprDqmY7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2I6V5zFq2Y7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdjPlqav6ZqRVqUuKVvTFyOsaN0U1+KqqB4WmKGo5x8YWaDnJh+aGqBlZSAbm9/j4+BdHR/iYmBenp/g4OAf4CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBgoB8e4CGiIF3dX6LjoNzb3yQlYVuaHmTm4hrYXaWooxoWnKZqZFmU2yasJZlTWebt5xlRmCbvaNlQFqaw6pmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2I6V5zFq2Y7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYjpXnMWrZjtTmMWuajxQk8Sxbz1Nj8K0cz5Ki8G3d0BHh7+6fEJFgr28gERDfru+hEZBebnAiUk/dbbCjUw+cbPDkU88bbDEllI7aK3FmlU7ZKnGnlk6YKXGolw6XKLGpWA6WZ7GqWQ7VZrFrWg7UpbEsG08T5HDs3E+TI3CtnU/SYnAuXlBRoS+u35DRIC8vYJFQny6v4dHQHe3wYtKPnO0wo9NPW+xxJNQPGquxZhTO2arxZxXOmKnxqBbOl6kxqReOlugxqdiOlecxatmO1OYxa5qPFCTxLFvPU2PwrRzPkqLwbd3QEeHv7p8QkWCvbyAREN+u76ERkF5ucCJST91tsKNTD5xs8ORTzxtsMSWUjtorcWaVTtkqcaeWTpgpcaiXDpcosalYDpZnsapZDtVmsWtaDtSlsSwbTxPkcOzcT5MjcK2dT9JicC5eUFGhL67fkNEgLy9gkVCfLq/h0dAd7fBi0o+c7TCj009b7HEk1A8aq7FmFM7ZqvFnFc6YqfGoFs6XqTGpF46W6DGp2I6V5zFq2Y7U5jFrmo8UJPEsW89TY/CtHM+SovBt3dAR4e/unxCRYK9vIBEQ367voRGQXm5wIlJP3W2wo1MPnGzw5FPPG2wxJZSO2itxZpVO2Spxp5ZOmClxqJcOlyixqVgOlmexqlkO1Waxa1oO1KWxLBtPE+Rw7NxPkyNwrZ1P0mJwLl5QUaEvrt+Q0SAvL2CRUJ8ur+HR0B3t8GLSj5ztMKPTT1vscSTUDxqrsWYUztmq8WcVzpip8agWzpepMakXjpboManYz5amr+makValLilb0xcjrGjdFNfiqqgeFpihqOcfGFmg5yYfmhqgZWUgG5vf4+PgXR0f4mJgXp6f4ODgH8="
+};
+const players={};
+
+/* Mora se pozvati iz korisnickog dodira — bez toga browser ne da da se pusti zvuk. */
+function audioBoot(){
+  if(audioArmed)return true;
+  try{
+    keepEl=new Audio(SIL); keepEl.loop=true; keepEl.preload="auto"; keepEl.volume=0.03;
+    for(const k in TONES){const a=new Audio(TONES[k]); a.preload="auto"; players[k]=a;}
+    const pr=keepEl.play(); if(pr&&pr.catch)pr.catch(()=>{});
+    if("mediaSession" in navigator){
+      try{
+        navigator.mediaSession.metadata=new MediaMetadata({
+          title:"Radari · Crna Gora", artist:"upozorenja na radare"});
+        navigator.mediaSession.playbackState="playing";
+        /* Auto zna poslati pauzu s volana ili pri promjeni izvora zvuka;
+           sesija se ne smije zatvoriti jer bi upozorenja zanijemila. */
+        navigator.mediaSession.setActionHandler("pause",()=>{keepEl&&keepEl.play().catch(()=>{});});
+        navigator.mediaSession.setActionHandler("play", ()=>{keepEl&&keepEl.play().catch(()=>{});});
+      }catch(e){}
+    }
+    try{speechSynthesis.getVoices();}catch(e){}
+    audioArmed=true;
+  }catch(e){audioArmed=false;}
+  audioNote();
+  return audioArmed;
+}
+function audioOff(){
+  try{
+    if(keepEl){keepEl.pause();keepEl=null;}
+    if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";
+  }catch(e){}
+  audioArmed=false; audioNote();
+}
+function audioNote(){
+  const el=document.getElementById("audioNote"); if(!el)return;
+  el.textContent=audioArmed
+    ? "Zvuk je aktivan i u pozadini — aplikacija drži medijsku sesiju. Ekran ipak ostavi uključen: Chrome usporava GPS kad je stranica u pozadini."
+    : "Zvuk se uključuje na prvi dodir — pritisni „Proba“ ili „Pokreni praćenje“.";
+}
+
+/* Glasovi stizu asinhrono; bez ovoga prvi izgovor ide na pogresnom jeziku. */
+function pickVoice(){
+  try{ sayVoice=speechSynthesis.getVoices().find(v=>/sr|hr|bs|sh/i.test(v.lang))||null; }catch(e){}
+}
+try{ speechSynthesis.addEventListener("voiceschanged",pickVoice); pickVoice(); }catch(e){}
+
 function say(t){if(!sound)return;try{
   const u=new SpeechSynthesisUtterance(t);
-  const v=speechSynthesis.getVoices().find(v=>/sr|hr|bs|sh/i.test(v.lang));
-  if(v)u.voice=v;else u.lang="hr-HR";u.rate=1.05;
-  speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
-function beep(n,f){if(!sound)return;try{
-  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-  if(ac.state==="suspended")ac.resume();
-  for(let i=0;i<n;i++){const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*0.2;
-    o.type="square";o.frequency.value=f;
-    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.3,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.14);
-    o.connect(g).connect(ac.destination);o.start(t);o.stop(t+0.16);}}catch(e){}}
+  if(sayVoice)u.voice=sayVoice; else u.lang="hr-HR";
+  u.rate=1.05; u.volume=1;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){}}
+
+function beep(n,f){if(!sound)return;
+  const a=players[n+"_"+f]||players["2_880"]; if(!a)return;
+  try{ a.currentTime=0; const pr=a.play(); if(pr&&pr.catch)pr.catch(()=>{}); }catch(e){}}
+
+/* Cuvar: sistem zna pauzirati i petlju i red govora dok je ekran ugasen. */
+setInterval(()=>{try{
+  if(!audioArmed)return;
+  if(keepEl&&keepEl.paused)keepEl.play().catch(()=>{});
+  if(speechSynthesis.paused)speechSynthesis.resume();
+}catch(e){}},5000);
+
+/* Prvi dodir bilo gdje naoruza zvuk, da "Proba" ne bude jedini nacin. */
+addEventListener("pointerdown",()=>audioBoot(),{once:true});
 
 /* ================= STANJE ================= */
 const $=id=>document.getElementById(id);
@@ -553,6 +625,7 @@ let watchId=null,lastFix=null,heading=null,speed=0,wake=null,active=null,lastRes
 /* ================= PRAĆENJE ================= */
 function start(){
   if(!navigator.geolocation){$("status").textContent="Uređaj nema GPS";return;}
+  audioBoot();
   beep(1,660);say("Praćenje uključeno");
   watchId=navigator.geolocation.watchPosition(onFix,onErr,{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
   $("startBtn").textContent="Zaustavi praćenje";$("startBtn").classList.remove("primary");
@@ -568,6 +641,7 @@ function stop(){
   $("secBox").hidden=true;$("kmh").textContent="—";$("speedBox").classList.remove("over");
   R.forEach(r=>r.st=0);
   $("maphud").hidden=true; $("mefollow").hidden=true; rotTarget=0;
+  audioOff();
   if(wake){wake.release();wake=null;}
 }
 function onErr(e){$("dot").className="dot err";
@@ -713,13 +787,26 @@ let mz=8, mlat=42.6, mlon=19.2, mapOn=false, follow=true, sel=null, raf=0;
 const tiles=new Map();
 
 /* Slojevi podloge. Esri ima red /z/y/x — obrnuto od ostalih. */
+const MAPBOX_TOKEN="pk.eyJ1IjoidmxhZG9zLTM4MiIsImEiOiJjbXR1NWJyMTUwN3Y1MnpzNTZ6NjR6cGpqIn0.sGLD1W8vU-xCgaXLA3fENg";
+const MB=(style,z,x,y)=>
+  "https://api.mapbox.com/styles/v1/mapbox/"+style+"/tiles/256/"+z+"/"+x+"/"+y+
+  "?access_token="+MAPBOX_TOKEN;
 const LAYERS=[
   {id:"osm",  name:"Mapa",    max:19, attr:"© OpenStreetMap",
    url:(z,x,y)=>"https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png"},
   {id:"sat",  name:"Satelit", max:18, attr:"Esri · Maxar · Earthstar Geographics",
    url:(z,x,y)=>"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"+z+"/"+y+"/"+x},
   {id:"night",name:"Noćna",   max:16, attr:"Esri · HERE · Garmin · © OpenStreetMap",
-   url:(z,x,y)=>"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/"+z+"/"+y+"/"+x}
+   url:(z,x,y)=>"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/"+z+"/"+y+"/"+x},
+  /* Mapbox rasterske plocice iz gotovih stilova. Javni token (pk.*) je namijenjen
+     klijentu, ali ga vidi svako ko otvori stranicu — ogranici ga po domenu u Mapbox
+     nalogu (token > URL restrictions), inace tudji saobracaj ulazi u tvoju kvotu. */
+  {id:"mbnav",name:"Navigacija",     max:19, attr:"© Mapbox · © OpenStreetMap",
+   url:(z,x,y)=>MB("navigation-night-v1",z,x,y)},
+  {id:"mbday",name:"Mapbox",         max:19, attr:"© Mapbox · © OpenStreetMap",
+   url:(z,x,y)=>MB("streets-v12",z,x,y)},
+  {id:"mbsat",name:"Mapbox satelit", max:19, attr:"© Mapbox · © Maxar · © OpenStreetMap",
+   url:(z,x,y)=>MB("satellite-streets-v12",z,x,y)}
 ];
 let layIdx=Math.max(0,LAYERS.findIndex(l=>l.id===CFG.layer));
 let autoZoom=true;
@@ -1115,7 +1202,8 @@ async function offStats(){
   $("offCount").textContent=n;
   $("offSize").textContent=sz;
   $("offLayer").textContent=LAYERS[layIdx].name;
-  if(!offBusy) $("offMsg").textContent="Plan preuzimanja: "+offPlan().length.toLocaleString("sr")+" pločica za podlogu „"+LAYERS[layIdx].name+"”.";
+  if(!offBusy) $("offMsg").textContent="Plan preuzimanja: "+offPlan().length.toLocaleString("sr")+" pločica za podlogu „"+LAYERS[layIdx].name+"”."
+    +(LAYERS[layIdx].id.startsWith("mb")?" Mapbox pločice ulaze u mjesečnu kvotu tvog naloga.":"");
 }
 
 async function offDownload(){
@@ -1246,7 +1334,7 @@ mojeOsvjezi();
 $("startBtn").onclick=()=>watchId?stop():start();
 $("soundBtn").onclick=e=>{sound=!sound;e.currentTarget.setAttribute("aria-pressed",sound);
   e.currentTarget.textContent=sound?"🔊":"🔇";if(sound)beep(1,880);};
-$("testBtn").onclick=()=>{beep(2,880);say("radar za četiristo metara, ograničenje osamdeset");};
+$("testBtn").onclick=()=>{audioBoot();beep(2,880);say("radar za četiristo metara, ograničenje osamdeset");};
 function goTab(v){
   document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.v===v));
   document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on",s.id===v));
