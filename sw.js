@@ -1,5 +1,5 @@
 /* Service worker: aplikacija radi bez interneta, pločice mape se čuvaju na telefonu. */
-const SHELL = "radari-shell-v2";
+const SHELL = "radari-shell-v3";
 const TILES = "radari-tiles-v1";
 
 const SHELL_FILES = [
@@ -9,8 +9,10 @@ const SHELL_FILES = [
   "./slike/rk-11.jpg", "./slike/rk-18.jpg"
 ];
 
-/* Hostovi sa kojih dolaze pločice podloge. */
-const TILE_HOST = /(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$|(^|\.)cartocdn\.com$/;
+/* Hostovi sa kojih dolaze pločice podloge.
+   api.mapbox.com nosi token u query stringu — keš ključ je cijeli URL, pa se
+   pločice skinute s jednim tokenom ne nalaze ako se token kasnije promijeni. */
+const TILE_HOST = /(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$|(^|\.)cartocdn\.com$|^api\.mapbox\.com$/;
 
 self.addEventListener("install", e => {
   /* Svaki fajl posebno: da jedan koji fali ne obori cijelo kesiranje. */
