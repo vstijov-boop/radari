@@ -186,6 +186,15 @@
   .sheet .card button svg{width:21px;height:21px;fill:var(--dim);flex:none}
   .sheet .card button em{font-style:normal;margin-left:auto;font-size:12.5px;color:var(--dim)}
   .sheet .card hr{border:0;border-top:1px solid var(--line);margin:6px 6px}
+  .sheet .card h3{margin:2px 12px 6px;font-size:16px;font-weight:600}
+  .sheet .card>.hint{margin:0 12px 10px}
+  .sheet .card input{margin:0 12px;background:#0e1721;color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:13px;
+    -webkit-user-select:text;user-select:text}
+  .dlgbtn{display:flex;gap:8px;margin:12px 12px 0}
+  .dlgbtn button{justify-content:center;border:1px solid var(--line);background:#1c2a3b;
+    padding:12px;flex:1;font-size:14px}
+  .dlgbtn button.primary{background:var(--ok);border-color:var(--ok);color:#06210f;font-weight:600}
   .toggle[aria-pressed="true"]{background:#24405c;border-color:#3d6488}
   @media (prefers-reduced-motion:no-preference){.dot.live{animation:p 2s ease-in-out infinite}}
   @keyframes p{50%{box-shadow:0 0 0 8px rgba(57,192,122,0)}}
@@ -441,6 +450,26 @@
       <svg><use href="#i-sound" id="soundIcon"/></svg>Zvuk upozorenja<em id="soundLbl">uključen</em>
     </button>
     <button id="testBtn"><svg><use href="#i-sound"/></svg>Proba zvuka</button>
+    <hr>
+    <button id="tokBtn"><svg><use href="#i-layers"/></svg>Mapbox token<em id="tokLbl">nije upisan</em></button>
+  </div>
+</div>
+
+<div class="sheet" id="tokDlg" hidden>
+  <div class="bg" id="tokBg"></div>
+  <div class="card">
+    <div class="grip"></div>
+    <h3>Mapbox token</h3>
+    <p class="hint">Javni token (počinje sa <b>pk.</b>) sa scopeom <b>styles:tiles</b>,
+      ograničen na ovaj domen. Čuva se samo u ovom pregledniku — ne šalje se nigdje
+      i nije dio aplikacije, pa ne može da procuri. Bez njega rade OpenStreetMap i Esri podloge.</p>
+    <input id="tokIn" type="text" placeholder="pk...." autocomplete="off" spellcheck="false">
+    <p class="hint" id="tokMsg"></p>
+    <div class="dlgbtn">
+      <button class="primary" id="tokSave">Sačuvaj</button>
+      <button id="tokDel">Obriši</button>
+      <button id="tokX">Odustani</button>
+    </div>
   </div>
 </div>
 
@@ -868,10 +897,13 @@ let mz=8, mlat=42.6, mlon=19.2, mapOn=false, follow=true, sel=null, raf=0;
 const tiles=new Map();
 
 /* Slojevi podloge. Esri ima red /z/y/x — obrnuto od ostalih. */
-const MAPBOX_TOKEN="pk.eyJ1IjoidmxhZG9zLTM4MiIsImEiOiJjbXR1NWJyMTUwN3Y1MnpzNTZ6NjR6cGpqIn0.sGLD1W8vU-xCgaXLA3fENg";
+/* Mapbox token se ne upisuje u kod: stavljen u javni repozitorijum, GitHub ga
+   prijavi Mapboxu i token bude poništen. Unosi se kroz Više > Mapbox token i
+   živi samo u localStorage ovog preglednika. */
+const MBTOK=()=>CFG.mbtok||"";
 const MB=(style,z,x,y)=>
   "https://api.mapbox.com/styles/v1/mapbox/"+style+"/tiles/256/"+z+"/"+x+"/"+y+
-  "?access_token="+MAPBOX_TOKEN;
+  "?access_token="+MBTOK();
 const LAYERS=[
   {id:"osm",  name:"Mapa",    max:19, attr:"© OpenStreetMap",
    url:(z,x,y)=>"https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png"},
@@ -882,14 +914,16 @@ const LAYERS=[
   /* Mapbox rasterske plocice iz gotovih stilova. Javni token (pk.*) je namijenjen
      klijentu, ali ga vidi svako ko otvori stranicu — ogranici ga po domenu u Mapbox
      nalogu (token > URL restrictions), inace tudji saobracaj ulazi u tvoju kvotu. */
-  {id:"mbnav",name:"Navigacija",     max:19, attr:"© Mapbox · © OpenStreetMap",
+  {id:"mbnav",tok:true,name:"Navigacija",     max:19, attr:"© Mapbox · © OpenStreetMap",
    url:(z,x,y)=>MB("navigation-night-v1",z,x,y)},
-  {id:"mbday",name:"Mapbox",         max:19, attr:"© Mapbox · © OpenStreetMap",
+  {id:"mbday",tok:true,name:"Mapbox",         max:19, attr:"© Mapbox · © OpenStreetMap",
    url:(z,x,y)=>MB("streets-v12",z,x,y)},
-  {id:"mbsat",name:"Mapbox satelit", max:19, attr:"© Mapbox · © Maxar · © OpenStreetMap",
+  {id:"mbsat",tok:true,name:"Mapbox satelit", max:19, attr:"© Mapbox · © Maxar · © OpenStreetMap",
    url:(z,x,y)=>MB("satellite-streets-v12",z,x,y)}
 ];
 let layIdx=Math.max(0,LAYERS.findIndex(l=>l.id===CFG.layer));
+/* Bez tokena Mapbox podloge ne postoje, pa ni zapamćeni izbor ne važi. */
+if(LAYERS[layIdx].tok&&!MBTOK())layIdx=0;
 let autoZoom=true;
 /* rot = koliko je mapa zarotirana, u stepenima; 0 znaci sjever gore.
    U rezimu "smjer voznje" cilj je -heading, pa pravac kretanja gleda navise. */
@@ -1094,7 +1128,8 @@ const zoomForSpeed=kmh => kmh<30?16 : kmh<60?15 : kmh<90?14 : 13;
 /* ---- izbor podloge ---- */
 function buildLayers(){
   $("layers").innerHTML=LAYERS.map((l,i)=>
-    '<button data-l="'+i+'" aria-pressed="'+(i===layIdx)+'">'+l.name+'</button>').join("");
+      (l.tok&&!MBTOK()) ? "" :
+      '<button data-l="'+i+'" aria-pressed="'+(i===layIdx)+'">'+l.name+'</button>').join("");
 }
 function setLayer(i){
   layIdx=i; layFail=0; CFG.layer=LAYERS[i].id; save();
@@ -1260,6 +1295,48 @@ $("sheetBg").onclick=()=>sheetOpen(false);
 $("sheet").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{
   sheetOpen(false); goTab(b.dataset.v);
 });
+
+/* ---- Mapbox token ---- */
+function tokSync(){
+  $("tokLbl").textContent=MBTOK()?"upisan":"nije upisan";
+}
+tokSync();
+$("tokBtn").onclick=()=>{
+  sheetOpen(false);
+  $("tokIn").value=MBTOK();
+  $("tokMsg").textContent="";
+  $("tokDlg").hidden=false;
+};
+$("tokX").onclick=$("tokBg").onclick=()=>{$("tokDlg").hidden=true;};
+$("tokDel").onclick=()=>{
+  delete CFG.mbtok; save();
+  if(LAYERS[layIdx].tok)setLayer(0); else buildLayers();
+  tokSync(); $("tokDlg").hidden=true;
+};
+$("tokSave").onclick=async()=>{
+  const t=$("tokIn").value.trim();
+  if(!t.startsWith("pk.")){
+    $("tokMsg").textContent="Treba javni token, koji po\u010dinje sa pk. \u2014 tajni sk. token nikako ne ide ovdje.";
+    return;
+  }
+  $("tokMsg").textContent="Provjeravam kod Mapboxa\u2026";
+  const prev=CFG.mbtok;
+  CFG.mbtok=t;
+  let ok=false, poruka="";
+  try{
+    const r=await fetch(MB("streets-v12",1,1,1));
+    ok=r.ok;
+    if(!ok) poruka=r.status+" "+((await r.json().catch(()=>({}))).message||"");
+  }catch(e){ poruka="nema veze sa internetom"; }
+  if(!ok){
+    if(prev===undefined) delete CFG.mbtok; else CFG.mbtok=prev;
+    $("tokMsg").textContent="Mapbox odbija token ("+poruka+"). Provjeri scope styles:tiles i da je "
+      +location.origin+" upisan u restrikcije.";
+    return;
+  }
+  save(); tokSync(); buildLayers();
+  $("tokDlg").hidden=true;
+};
 
 /* ============ OFFLINE MAPA ============ */
 /* Plan: cijela zemlja krupno (z8-12) + detaljno oko svakog radara (z13-15).
