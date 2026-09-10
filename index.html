@@ -958,10 +958,27 @@ function initMap(){
   clampZoom();
   drawMap();
 }
+/* Okvir platna se drzi samo dok traje pokret prstima: citanje na svaki pomak
+   tjera preglednik da preracuna raspored, a to se vidi kao trzanje. Van pokreta
+   se cita svjez, jer zapamceni ume da zastari (npr. kad mapa jos nije prikazana
+   pa nema ni velicinu). */
+let cvRect=null;
+function rectOf(){
+  if(cvRect&&cvRect.width>0) return cvRect;
+  return cv.getBoundingClientRect();
+}
 function sizeMap(){
   const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cvRect=null; minZKey="";
   cv.width=Math.max(1,Math.round(r.width*dpr));
   cv.height=Math.max(1,Math.round(r.height*dpr));
+}
+/* Vec ucitana plocica, bez pokretanja novog zahtjeva. */
+function cached(z,x,y){
+  const n=1<<z; if(z<0||y<0||y>=n)return null;
+  x=((x%n)+n)%n;
+  const im=tiles.get(LAYERS[layIdx].id+"/"+z+"/"+x+"/"+y);
+  return im&&im.ok?im:null;
 }
 function tile(z,x,y){
   const n=1<<z; if(y<0||y>=n)return null;
@@ -1022,9 +1039,20 @@ function drawMap(){
 
   for(let x=Math.floor((ox+bx0)/T);x<=Math.floor((ox+bx1)/T);x++)
     for(let y=Math.floor((oy+by0)/T);y<=Math.floor((oy+by1)/T);y++){
-      const im=tile(tz,x,y);
       /* Piksel preko ruba: bez toga se na decimalnom zumu vide linije izmedju plocica. */
-      if(im) ctx.drawImage(im,x*T-ox,y*T-oy,T+1,T+1);
+      const im=tile(tz,x,y);
+      if(im){ ctx.drawImage(im,x*T-ox,y*T-oy,T+1,T+1); continue; }
+      /* Kad zum predje na drugi nivo, nove plocice tek krecu da se skidaju.
+         Do tada se isti komad izrezuje iz vec ucitane plocice nizeg nivoa,
+         pa mapa ne trepne u prazno — to je ono sto je izgledalo kao skok. */
+      for(let up=1;up<=5;up++){
+        const pz=tz-up; if(pz<0)break;
+        const f=1<<up, pxx=Math.floor(x/f), pyy=Math.floor(y/f);
+        const pim=cached(pz,pxx,pyy); if(!pim)continue;
+        const src=pim.naturalWidth||TS, ss=src/f;
+        ctx.drawImage(pim,(x-pxx*f)*ss,(y-pyy*f)*ss,ss,ss,x*T-ox,y*T-oy,T+1,T+1);
+        break;
+      }
     }
 
   const P=(la,lo)=>[wx(lo,mz)*dpr-ox, wy(la,mz)*dpr-oy];
@@ -1125,15 +1153,19 @@ function drawMap(){
 /* Najdalje sto se moze odzumirati: zum na kojem cijela Crna Gora jos staje
    na ekran. Racuna se iz stvarne velicine platna, pa je tacno i na telefonu
    i na sirokom ekranu; okolina koja pretekne dolazi sama od odnosa stranica. */
+let minZCache=8, minZKey="";
 function minZoom(){
-  const r=cv.getBoundingClientRect(), W=r.width, H=r.height;
+  const r=rectOf(), W=r.width, H=r.height;
   if(W<10||H<10) return 8;
+  const key=Math.round(W)+"x"+Math.round(H);
+  if(key===minZKey) return minZCache;
   const M=1.0;
   let best=3;
   for(let z=3;z<=16;z++){
     const w=(wx(MNE.e,z)-wx(MNE.w,z))*M, h=(wy(MNE.s,z)-wy(MNE.n,z))*M;
     if(w<=W&&h<=H) best=z;
   }
+  minZKey=key; minZCache=best;
   return best;
 }
 function clampZoom(){ const lo=minZoom(); if(mz<lo)mz=lo; if(mz>LAYERS[layIdx].max)mz=LAYERS[layIdx].max; }
@@ -1143,8 +1175,8 @@ function clampZoom(){ const lo=minZoom(); if(mz<lo)mz=lo; if(mz>LAYERS[layIdx].m
 function zoomAround(z,cx,cy){
   const zlo=minZoom(), zhi=LAYERS[layIdx].max;
   z=Math.max(zlo,Math.min(zhi,z));
-  if(cx==null){ mz=z; drawMap(); return; }
-  const r0=cv.getBoundingClientRect();
+  if(cx==null){ mz=z; queueDraw(); return; }
+  const r0=rectOf();
   const dx=(cx-r0.left)-r0.width/2, dy=(cy-r0.top)-r0.height/2;
   /* Kad je mapa zarotirana, pomak se prvo vrati u prostor mape. */
   const rr=rot*RAD, cs=Math.cos(rr), sn=Math.sin(rr);
@@ -1153,7 +1185,9 @@ function zoomAround(z,cx,cy){
   mz=z;
   mlon=ilon(wx(glo,mz)-wdx,mz);
   mlat=ilat(wy(gla,mz)-wdy,mz);
-  drawMap();
+  /* Jedno crtanje po kadru ekrana: prst salje i po 120 dogadjaja u sekundi,
+     a toliko puta prekrivati platno je sporije nego sto ekran stigne. */
+  queueDraw();
 }
 function zoomTo(z){ zoomAround(z,null,null); }
 
@@ -1244,6 +1278,7 @@ function bindMapGestures(){
   let pts=new Map(), moved=0, base=0, baseZ=0, last=null;
   cv.addEventListener("pointerdown",e=>{
     cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const r=cv.getBoundingClientRect(); if(r.width>0) cvRect=r;
     if(pts.size===1){last={x:e.clientX,y:e.clientY};moved=0;}
     if(pts.size===2){
       const a=[...pts.values()];
@@ -1283,10 +1318,10 @@ function bindMapGestures(){
     /* Poslije stiskanja prstiju ostaje jedan prst: pomjeranje krece odatle,
        da mapa ne odskoci kad se drugi prst podigne. */
     if(pts.size===1){const b=[...pts.values()][0];last={x:b.x,y:b.y};moved=99;}
-    if(!pts.size)last=null;
+    if(!pts.size){ last=null; cvRect=null; }
   };
   cv.addEventListener("pointerup",up);
-  cv.addEventListener("pointercancel",e=>{pts.delete(e.pointerId);base=0;});
+  cv.addEventListener("pointercancel",e=>{pts.delete(e.pointerId);base=0;if(!pts.size)cvRect=null;});
   /* Tockic misa i touchpad daju sitne pomake, pa i oni idu u decimalama. */
   cv.addEventListener("wheel",e=>{
     e.preventDefault(); setFollow(false); autoZoom=false;
