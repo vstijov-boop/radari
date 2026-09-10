@@ -84,6 +84,15 @@
   .tgtchip{position:absolute;left:12px;top:12px;max-width:calc(100% - 90px);pointer-events:none;
     background:rgba(20,30,43,.92);border:1px solid var(--line);border-radius:12px;
     padding:8px 12px;font-size:12.5px;color:var(--warn);line-height:1.35}
+  /* Kad se mapa odvuce s pozicije, vraca se natpis — ikona gore desno je
+     uvijek tu, ali dugme s tekstom se lakse primijeti u voznji. */
+  .recenter{position:absolute;left:50%;transform:translateX(-50%);bottom:70px;z-index:3;
+    background:rgba(20,30,43,.96);border:1px solid var(--blue);color:var(--blue);
+    border-radius:22px;padding:9px 16px;font-size:13.5px;font-weight:600;
+    box-shadow:0 4px 14px rgba(0,0,0,.45);display:flex;align-items:center;gap:7px}
+  .recenter[hidden]{display:none}
+  .recenter svg{width:17px;height:17px;fill:currentColor}
+
   /* Plavo dugme za dodavanje oznake, dolje desno. */
   .fab{position:absolute;right:12px;bottom:14px;z-index:2;background:var(--blue);
     border-color:var(--blue);color:#fff;border-radius:24px;padding:12px 18px;font-weight:600;
@@ -298,6 +307,9 @@
   <div class="layers" id="layers"></div>
 
   <div class="mapinfo" id="mapinfo" hidden></div>
+  <button class="recenter" id="mePill" hidden>
+    <svg aria-hidden="true"><use href="#i-target"/></svg>Centriraj
+  </button>
   <button class="fab" id="addBtn" title="Dodaj oznaku">
     <svg aria-hidden="true"><use href="#i-plus"/></svg>Dodaj
   </button>
@@ -991,7 +1003,11 @@ function stepRot(){
 
 function drawMap(){
   if(!mapOn)return;
-  const dpr=window.devicePixelRatio||1, W=cv.width, H=cv.height, T=TS*dpr;
+  const dpr=window.devicePixelRatio||1, W=cv.width, H=cv.height;
+  /* mz je decimalan da bi zumiranje prstima bilo glatko. Plocice postoje samo
+     u cijelim nivoima, pa se uzima najblizi i razvlaci za ostatak. */
+  const tz=Math.max(0,Math.min(LAYERS[layIdx].max,Math.round(mz)));
+  const T=TS*dpr*Math.pow(2,mz-tz);
   const ox=wx(mlon,mz)*dpr-W/2, oy=wy(mlat,mz)*dpr-H/2;
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle="#0a1017"; ctx.fillRect(0,0,W,H);
@@ -1006,8 +1022,9 @@ function drawMap(){
 
   for(let x=Math.floor((ox+bx0)/T);x<=Math.floor((ox+bx1)/T);x++)
     for(let y=Math.floor((oy+by0)/T);y<=Math.floor((oy+by1)/T);y++){
-      const im=tile(mz,x,y);
-      if(im) ctx.drawImage(im,Math.round(x*T-ox),Math.round(y*T-oy),Math.ceil(T),Math.ceil(T));
+      const im=tile(tz,x,y);
+      /* Piksel preko ruba: bez toga se na decimalnom zumu vide linije izmedju plocica. */
+      if(im) ctx.drawImage(im,x*T-ox,y*T-oy,T+1,T+1);
     }
 
   const P=(la,lo)=>[wx(lo,mz)*dpr-ox, wy(la,mz)*dpr-oy];
@@ -1099,7 +1116,7 @@ function drawMap(){
   /* Potpis izvora ide u sredinu dolje: lijevo je pokazivac brzine, desno dugme Dodaj. */
   ctx.font=(11*dpr)+"px system-ui";ctx.fillStyle="rgba(232,238,246,.72)";ctx.textAlign="center";
   ctx.shadowColor="rgba(0,0,0,.85)";ctx.shadowBlur=4*dpr;
-  ctx.fillText(LAYERS[layIdx].attr+" · zum "+mz, W/2, H-8*dpr);
+  ctx.fillText(LAYERS[layIdx].attr+" · zum "+Math.round(mz), W/2, H-8*dpr);
   ctx.shadowBlur=0;ctx.textAlign="left";
 
   if(spin) queueDraw();
@@ -1120,8 +1137,39 @@ function minZoom(){
   return best;
 }
 function clampZoom(){ const lo=minZoom(); if(mz<lo)mz=lo; if(mz>LAYERS[layIdx].max)mz=LAYERS[layIdx].max; }
-function zoomTo(z){ mz=Math.max(minZoom(),Math.min(LAYERS[layIdx].max,z)); drawMap(); }
-function manualZoom(z){ autoZoom=false; zoomTo(z); }
+
+/* Zumiranje oko tacke na ekranu: geografska tacka ispod prsta ostaje ispod
+   prsta i poslije promjene zuma. Bez sidra mapa "bjezi" pri stiskanju prstiju. */
+function zoomAround(z,cx,cy){
+  const zlo=minZoom(), zhi=LAYERS[layIdx].max;
+  z=Math.max(zlo,Math.min(zhi,z));
+  if(cx==null){ mz=z; drawMap(); return; }
+  const r0=cv.getBoundingClientRect();
+  const dx=(cx-r0.left)-r0.width/2, dy=(cy-r0.top)-r0.height/2;
+  /* Kad je mapa zarotirana, pomak se prvo vrati u prostor mape. */
+  const rr=rot*RAD, cs=Math.cos(rr), sn=Math.sin(rr);
+  const wdx=dx*cs+dy*sn, wdy=-dx*sn+dy*cs;
+  const gla=ilat(wy(mlat,mz)+wdy,mz), glo=ilon(wx(mlon,mz)+wdx,mz);
+  mz=z;
+  mlon=ilon(wx(glo,mz)-wdx,mz);
+  mlat=ilat(wy(gla,mz)-wdy,mz);
+  drawMap();
+}
+function zoomTo(z){ zoomAround(z,null,null); }
+
+/* Dugmad + i - mijenjaju zum u koraku, ali animirano, da ne trza. */
+let zAnim=0;
+function zoomStep(z,cx,cy){
+  cancelAnimationFrame(zAnim);
+  const z0=mz, t0=performance.now(), D=170;
+  const korak=()=>{
+    const k=Math.min(1,(performance.now()-t0)/D);
+    zoomAround(z0+(z-z0)*(1-Math.pow(1-k,3)),cx,cy);
+    if(k<1) zAnim=requestAnimationFrame(korak);
+  };
+  korak();
+}
+function manualZoom(z){ autoZoom=false; zoomStep(z,null,null); }
 /* Brze vozis - vidis dalje ispred sebe. */
 const zoomForSpeed=kmh => kmh<30?16 : kmh<60?15 : kmh<90?14 : 13;
 
@@ -1184,6 +1232,7 @@ $("layers").addEventListener("click",e=>{
 function setFollow(v){
   follow=v;
   $("mefollow").setAttribute("aria-pressed",v);
+  $("mePill").hidden = v || !lastFix;
 }
 /* Dugme "Dodaj" se sklanja iznad panela s podacima kad se panel otvori. */
 function layoutRecenter(){
@@ -1192,19 +1241,27 @@ function layoutRecenter(){
 }
 
 function bindMapGestures(){
-  let pts=new Map(), moved=0, base=0, last=null;
+  let pts=new Map(), moved=0, base=0, baseZ=0, last=null;
   cv.addEventListener("pointerdown",e=>{
     cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size===1){last={x:e.clientX,y:e.clientY};moved=0;}
-    if(pts.size===2){const a=[...pts.values()];base=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);}
+    if(pts.size===2){
+      const a=[...pts.values()];
+      base=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      baseZ=mz;                       /* zum od kojeg se racuna odnos rastojanja */
+      cancelAnimationFrame(zAnim);
+    }
   });
   cv.addEventListener("pointermove",e=>{
     if(!pts.has(e.pointerId))return;
     pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size===2){
       const a=[...pts.values()], d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
-      if(base&&d/base>1.55){manualZoom(mz+1);base=d;}
-      if(base&&d/base<0.65){manualZoom(mz-1);base=d;}
+      if(base>10&&d>10){
+        autoZoom=false;
+        /* Duplo rastojanje prstiju = jedan nivo zuma vise. */
+        zoomAround(baseZ+Math.log2(d/base),(a[0].x+a[1].x)/2,(a[0].y+a[1].y)/2);
+      }
       moved=99;return;
     }
     if(!last)return;
@@ -1221,12 +1278,22 @@ function bindMapGestures(){
   });
   const up=e=>{
     if(pts.size===1&&moved<8&&last) pick(e.clientX,e.clientY);
-    pts.delete(e.pointerId); if(pts.size<2)base=0; if(!pts.size)last=null;
+    pts.delete(e.pointerId);
+    if(pts.size<2)base=0;
+    /* Poslije stiskanja prstiju ostaje jedan prst: pomjeranje krece odatle,
+       da mapa ne odskoci kad se drugi prst podigne. */
+    if(pts.size===1){const b=[...pts.values()][0];last={x:b.x,y:b.y};moved=99;}
+    if(!pts.size)last=null;
   };
   cv.addEventListener("pointerup",up);
   cv.addEventListener("pointercancel",e=>{pts.delete(e.pointerId);base=0;});
-  cv.addEventListener("wheel",e=>{e.preventDefault();setFollow(false);manualZoom(mz+(e.deltaY<0?1:-1));},{passive:false});
-  cv.addEventListener("dblclick",e=>{e.preventDefault();manualZoom(mz+1);});
+  /* Tockic misa i touchpad daju sitne pomake, pa i oni idu u decimalama. */
+  cv.addEventListener("wheel",e=>{
+    e.preventDefault(); setFollow(false); autoZoom=false;
+    cancelAnimationFrame(zAnim);
+    zoomAround(mz-e.deltaY*(e.deltaMode===1?0.08:0.0035),e.clientX,e.clientY);
+  },{passive:false});
+  cv.addEventListener("dblclick",e=>{e.preventDefault();autoZoom=false;zoomStep(Math.round(mz)+1,e.clientX,e.clientY);});
 }
 
 function pick(cx,cy){
@@ -1279,7 +1346,31 @@ function info(r){
 
 $("zin").onclick=()=>manualZoom(mz+1);
 $("zout").onclick=()=>manualZoom(mz-1);
-$("mefollow").onclick=()=>{autoZoom=true;if(lastFix){mlat=lastFix.lat;mlon=lastFix.lon;if(mz<13)mz=15;}setFollow(true);drawMap();};
+/* Centriranje na sebe. Ranije nije radilo dok pracenje ne krene, jer pozicija
+   nije ni trazena — sada se, ako fiksa nema, zatrazi jednokratno. */
+function recenter(){
+  autoZoom=true;
+  if(lastFix){
+    mlat=lastFix.lat; mlon=lastFix.lon;
+    setFollow(true);
+    zoomStep(Math.max(mz,zoomForSpeed(speed*3.6)),null,null);
+    return;
+  }
+  if(!navigator.geolocation){ $("status").textContent="Uređaj nema GPS"; return; }
+  $("status").textContent="tražim poziciju…";
+  navigator.geolocation.getCurrentPosition(pos=>{
+    lastFix={lat:pos.coords.latitude,lon:pos.coords.longitude,t:pos.timestamp};
+    mlat=lastFix.lat; mlon=lastFix.lon;
+    setFollow(true);
+    zoomStep(Math.max(mz,16),null,null);
+    $("status").textContent=watchId?"prati":"GPS isključen";
+  },err=>{
+    $("status").textContent=err.code===1?"dozvoli pristup lokaciji":"nema GPS signala";
+    setTimeout(()=>{ if(!watchId) $("status").textContent="GPS isključen"; },5000);
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+}
+$("mefollow").onclick=recenter;
+$("mePill").onclick=recenter;
 
 /* ---- donja traka i list "Više" ---- */
 function syncTrack(on){
